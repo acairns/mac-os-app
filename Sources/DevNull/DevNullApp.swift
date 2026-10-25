@@ -29,7 +29,10 @@ struct DevNullApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Updates.shared.start()
+        // The App Store updates its own build, and App Review rejects apps that check for updates themselves.
+        #if !APP_STORE
+            Updates.shared.start()
+        #endif
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
@@ -81,7 +84,9 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About /dev/null") { AboutWindow.show() }
-            Button(Updates.shared.available.map { "Get /dev/null \($0.version)…" } ?? "Check for Updates…") { Updates.shared.checkFromMenu() }
+            #if !APP_STORE
+                Button(Updates.shared.available.map { "Get /dev/null \($0.version)…" } ?? "Check for Updates…") { Updates.shared.checkFromMenu() }
+            #endif
         }
 
         CommandGroup(replacing: .newItem) {

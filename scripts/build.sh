@@ -12,6 +12,10 @@
 #       device key again after each update, but macOS asks people to approve the app the first time they open it.
 #   Neither: signed ad hoc, for trying a build on this Mac only.
 #
+# APP_STORE_PROFILE=<Mac App Store provisioning profile> builds for the Mac App Store instead: sandboxed, without the
+# update check, signed with the Apple Distribution certificate and packed in .build/package/DevNull.pkg for Transporter.
+# It leaves the DMG and the release file alone.
+#
 # Needs Xcode (actool compiles the icon), a git checkout (the build number comes from the commit count) and the website
 # checked out beside this repository, at ../dev-null.sh.
 set -euo pipefail
@@ -50,10 +54,15 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/en.lproj" "$DOWNLOADS"
 
 # MARK: App
 
-swift build -c release --arch arm64 --arch x86_64
+SWIFT_FLAGS=(-c release --arch arm64 --arch x86_64)
+if [[ -n "${APP_STORE_PROFILE:-}" ]]; then
+    SWIFT_FLAGS+=(-Xswiftc -DAPP_STORE)
+fi
+
+swift build "${SWIFT_FLAGS[@]}"
 
 # Where SwiftPM put the build depends on the toolchain's build system, so ask it rather than guess.
-cp "$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/DevNull" "$APP/Contents/MacOS/DevNull"
+cp "$(swift build "${SWIFT_FLAGS[@]}" --show-bin-path)/DevNull" "$APP/Contents/MacOS/DevNull"
 cp "$ROOT/Sources/DevNull/Resources/emoji-shortcodes.json" "$ROOT/Sources/DevNull/Resources/emoji-categories.json" "$ROOT/Sources/DevNull/Resources/remote.mp3" "$APP/Contents/Resources/"
 
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
@@ -71,7 +80,10 @@ xcrun actool "$BUILD/icon/AppIcon.icon" --compile "$APP/Contents/Resources" --pl
     --output-partial-info-plist "$BUILD/icon/partial.plist" >/dev/null
 iconutil -c icns "$BUILD/icon/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 
-if [[ -n "${DEVELOPER_ID:-}" ]]; then
+if [[ -n "${APP_STORE_PROFILE:-}" ]]; then
+    cp "$APP_STORE_PROFILE" "$APP/Contents/embedded.provisionprofile"
+    codesign --force --timestamp --entitlements "$ROOT/DevNull.AppStore.entitlements" --sign "Apple Distribution" "$APP"
+elif [[ -n "${DEVELOPER_ID:-}" ]]; then
     codesign --force --options runtime --timestamp --entitlements "$ROOT/DevNull.entitlements" --sign "$DEVELOPER_ID" "$APP"
 else
     codesign --force --options runtime --entitlements "$ROOT/DevNull.entitlements" --sign "${SIGN_IDENTITY:--}" "$APP"
@@ -97,6 +109,18 @@ done
 
 # The preview's made-up data and its commands are DEBUG-only and must never ship.
 [[ "$(strings "$APP/Contents/MacOS/DevNull" | grep -c "preview.dev-null.invalid" || true)" == "0" ]] || fail "the release binary contains preview code"
+
+# MARK: App Store
+
+if [[ -n "${APP_STORE_PROFILE:-}" ]]; then
+    codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "com.apple.security.app-sandbox" \
+        || fail "the sandbox entitlement is missing, so the App Store rejects the build"
+
+    productbuild --component "$APP" /Applications --sign "3rd Party Mac Developer Installer" "$BUILD/DevNull.pkg" >/dev/null
+
+    echo "Built $BUILD/DevNull.pkg: /dev/null $VERSION ($BUILD_NUMBER, $REVISION) for the Mac App Store"
+    exit 0
+fi
 
 # MARK: DMG
 

@@ -52,8 +52,10 @@ struct AboutView: View {
                 .padding(.top, DS.Spacing.xxxl + DS.Spacing.s)
                 .padding(.bottom, DS.Spacing.xl)
 
-            UpdateStatus(updates: updates)
-                .padding(.bottom, DS.Spacing.xl)
+            #if !APP_STORE
+                UpdateStatus(updates: updates)
+                    .padding(.bottom, DS.Spacing.xl)
+            #endif
 
             Divider().overlay(DS.Colors.hairline)
 
