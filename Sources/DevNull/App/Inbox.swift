@@ -43,6 +43,9 @@ final class Inbox {
     @ObservationIgnored private var openedReference: ThreadReference?
     @ObservationIgnored private var poller: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    @ObservationIgnored private var hoverTask: Task<Void, Never>?
+    @ObservationIgnored private var hovered: ThreadReference?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var restored = false
 
@@ -94,6 +97,8 @@ final class Inbox {
 
     func stop() {
         poller?.cancel()
+        prefetchTask?.cancel()
+        hoverTask?.cancel()
         threads.values.forEach { $0.stop() }
     }
 
@@ -177,7 +182,9 @@ final class Inbox {
 
     /// Shows a message the thread just sent or received as the conversation's last one right away, moving it to the
     /// top of its group, before the next poll confirms it.
-    func showLocally(_ message: Message, in reference: ThreadReference) {
+    /// `alerted` says the thread already chimed for the message. A thread that took it in without chiming, such as one
+    /// loaded earlier and no longer on screen, leaves the alert to the inbox.
+    func showLocally(_ message: Message, in reference: ThreadReference, alerted: Bool) {
         guard let index = conversations.firstIndex(where: { $0.reference.id == reference.id }) else { return }
 
         let current = conversations[index]
@@ -192,16 +199,19 @@ final class Inbox {
         next.remove(at: index)
         next.insert(updated, at: current.isPinned ? index : next.firstIndex { !$0.isPinned } ?? next.count)
 
-        if incoming { lastSeenIncoming[current.id] = max(lastSeenIncoming[current.id] ?? 0, message.id) }
+        if incoming, alerted { lastSeenIncoming[current.id] = max(lastSeenIncoming[current.id] ?? 0, message.id) }
         conversations = next
     }
 
     /// Loads the threads at the top of the inbox in the background, one after another, so opening one is instant.
     private func prefetch() {
-        let references = conversations.prefix(20).map(\.reference)
+        let references = conversations.prefix(5).map(\.reference)
 
-        Task {
+        // Switching tabs again drops the previous tab's run instead of running both.
+        prefetchTask?.cancel()
+        prefetchTask = Task {
             for reference in references {
+                guard !Task.isCancelled else { return }
                 await thread(for: reference).prefetch()
             }
         }
@@ -382,9 +392,23 @@ final class Inbox {
         NSApp.dockTile.badgeLabel = unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : nil
     }
 
-    /// Starts loading a thread the pointer rests on, so it is there by the time it is clicked.
+    /// Starts loading a thread the pointer rests on, so it is there by the time it is clicked. The pointer has to stay
+    /// a moment: sweeping it across the list loads nothing.
     func prefetch(_ reference: ThreadReference) {
-        Task { await thread(for: reference).prefetch() }
+        hovered = reference
+        hoverTask?.cancel()
+        hoverTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await thread(for: reference).prefetch()
+        }
+    }
+
+    /// The pointer left the row before the load started. Only that row's load is dropped, whichever of leaving one
+    /// row and entering the next is reported first.
+    func cancelPrefetch(_ reference: ThreadReference) {
+        guard hovered == reference else { return }
+        hoverTask?.cancel()
     }
 }
 

@@ -85,10 +85,13 @@ struct ChatView: View {
             thread.activate()
             thread.markRead()
         }
-        .onDisappear { thread.endViewing() }
+        .onDisappear {
+            thread.endViewing()
+            thread.deactivate()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             thread.markRead()
-            Task { await thread.poll() }
+            Task { await thread.pollIfStale() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showInfo)) { _ in showsInfo = true }
         .onReceive(NotificationCenter.default.publisher(for: .scrollToBottom)) { _ in chat.list.scrollToBottom() }

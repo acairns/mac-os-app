@@ -34,6 +34,12 @@ struct MainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .newRemote)) { _ in showsNewRemote = true }
         .onReceive(NotificationCenter.default.publisher(for: .newOrg)) { _ in showsNewOrg = true }
+        .onAppear {
+            if let id = AppDelegate.pendingConversation {
+                AppDelegate.pendingConversation = nil
+                inbox.open(conversationId: id)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
             if let id = notification.object as? String {
                 inbox.open(conversationId: id)
@@ -112,7 +118,7 @@ struct SidebarView: View {
                         .sidebarSelection(inbox.selection == conversation.reference)
                         .tag(conversation.reference)
                         .contextMenu { ConversationMenu(conversation: conversation) }
-                        .onHover { if $0 { inbox.prefetch(conversation.reference) } }
+                        .onHover { $0 ? inbox.prefetch(conversation.reference) : inbox.cancelPrefetch(conversation.reference) }
                         .onAppear {
                             if conversation.id == inbox.conversations.last?.id {
                                 Task { await inbox.loadMore() }

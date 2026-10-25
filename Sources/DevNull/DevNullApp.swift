@@ -28,6 +28,12 @@ struct DevNullApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Opens the main window, set by the menu commands, which SwiftUI keeps around while no window is open.
+    static var openMainWindow: (() -> Void)?
+
+    /// The conversation a banner was clicked for while the window was closed, opened once the window is back.
+    static var pendingConversation: String?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // The App Store updates its own build, and App Review rejects apps that check for updates themselves.
         #if !APP_STORE
@@ -42,6 +48,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             UNTextInputNotificationAction(identifier: "reply", title: "Reply", options: [], textInputButtonTitle: "Push", textInputPlaceholder: "Push a reply"),
             UNNotificationAction(identifier: "read", title: "Mark as Pulled", options: []),
         ], intentIdentifiers: [])])
+    }
+
+    /// Clicking the Dock icon brings the window back after it was closed: SwiftUI doesn't open it again by itself, and the
+    /// New Window item it would otherwise use is replaced by New Remote.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !flag else { return true }
+
+        // A minimized window comes back as it was instead of a second one opening.
+        if let window = sender.windows.first(where: \.isMiniaturized) {
+            window.deminiaturize(nil)
+        } else {
+            Self.openMainWindow?()
+        }
+
+        return false
     }
 
     /// Banners show while the app is in front too, unless the conversation is the one being read (the inbox skips those).
@@ -62,7 +83,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 NotificationCenter.default.post(name: .markReadFromBanner, object: id)
             default:
                 NSApp.activate(ignoringOtherApps: true)
-                NotificationCenter.default.post(name: .openConversation, object: id)
+
+                if NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+                    NotificationCenter.default.post(name: .openConversation, object: id)
+                } else {
+                    Self.pendingConversation = id
+                    Self.openMainWindow?()
+                }
             }
         }
     }
@@ -81,7 +108,11 @@ extension Notification.Name {
 struct AppCommands: Commands {
     let session: Session
 
+    @Environment(\.openWindow) private var openWindow
+
     var body: some Commands {
+        let _ = AppDelegate.openMainWindow = { [openWindow] in openWindow(id: "main") }
+
         CommandGroup(replacing: .appInfo) {
             Button("About /dev/null") { AboutWindow.show() }
             #if !APP_STORE

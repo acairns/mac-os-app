@@ -105,6 +105,8 @@ final class ThreadModel {
     @ObservationIgnored private var poller: Task<Void, Never>?
     @ObservationIgnored private var lastTypingSentAt = Date.distantPast
     @ObservationIgnored private var isPolling = false
+    @ObservationIgnored private var viewers = 0
+    @ObservationIgnored private var lastFetchedAt = Date.distantPast
 
     var api: APIClient { inbox.api }
     var me: String? { inbox.session.user?.id }
@@ -140,27 +142,47 @@ final class ThreadModel {
 
     // MARK: - Polling
 
+    /// A window shows the thread: it polls while at least one does, and stops when the last one moves on, so going
+    /// through threads doesn't leave each one polling behind.
     func activate() {
+        viewers += 1
+        startPolling()
+    }
+
+    func deactivate() {
+        viewers = max(0, viewers - 1)
+        if viewers == 0 { stop() }
+    }
+
+    func stop() {
+        poller?.cancel()
+        poller = nil
+    }
+
+    private func startPolling() {
         guard poller == nil else { return }
 
         poller = Task { [weak self] in
-            if self?.isLoaded == true {
-                await self?.poll()
-            } else {
-                await self?.load()
-            }
+            if self?.isLoaded != true { await self?.load() }
 
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(self?.pollInterval ?? 15))
+                try? await Task.sleep(for: .seconds(self?.nextPollDelay ?? 15))
                 guard let self, !Task.isCancelled else { return }
                 await self.poll()
             }
         }
     }
 
-    func stop() {
-        poller?.cancel()
-        poller = nil
+    /// What's left of the interval since the last fetch, so a thread opened again right after it was read, or right
+    /// after a hover loaded it, waits its turn instead of asking at once.
+    private var nextPollDelay: Double {
+        max(0, pollInterval - Date().timeIntervalSince(lastFetchedAt))
+    }
+
+    /// Polls unless the thread was fetched in the last moments, as switching back to the app over and over would.
+    func pollIfStale() async {
+        guard Date().timeIntervalSince(lastFetchedAt) >= 1.5 else { return }
+        await poll()
     }
 
     /// Every 1.5 seconds while someone is typing or the user was active in the last minute, every 3 while the app is in
@@ -201,7 +223,7 @@ final class ThreadModel {
         stop()
         messages = []
         isLoaded = false
-        activate()
+        if viewers > 0 { startPolling() }
     }
 
     @ObservationIgnored private var loading: Task<Void, Never>?
@@ -219,6 +241,8 @@ final class ThreadModel {
     }
 
     private func fetchLatest() async {
+        lastFetchedAt = Date()
+
         do {
             let thread: DataEnvelope<ChatThread> = try await api.get(reference.path + "/messages")
             apply(thread.data)
@@ -244,6 +268,7 @@ final class ThreadModel {
         }
 
         isPolling = true
+        lastFetchedAt = Date()
         defer { isPolling = false }
 
         do {
@@ -361,7 +386,8 @@ final class ThreadModel {
         guard !fresh.isEmpty else { return }
 
         // A message from someone else arriving in the open thread chimes, unless the thread is muted.
-        if isViewing, isLoaded, fresh.contains(where: { $0.userId != me && !$0.isEvent }), !(mutedUntilAt.map { $0 > .now } ?? false) {
+        let chimes = isViewing && isLoaded && fresh.contains(where: { $0.userId != me && !$0.isEvent }) && !(mutedUntilAt.map { $0 > .now } ?? false)
+        if chimes {
             Sounds.newMessage()
         }
 
@@ -371,7 +397,7 @@ final class ThreadModel {
         messages.sort { $0.id < $1.id }
 
         if let last = messages.last, isLoaded {
-            inbox.showLocally(last, in: reference)
+            inbox.showLocally(last, in: reference, alerted: chimes)
         }
     }
 
