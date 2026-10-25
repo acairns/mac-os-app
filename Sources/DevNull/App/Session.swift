@@ -88,6 +88,8 @@ final class Session {
                 URLQueryItem(name: "state", value: state),
                 URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
             ]
+            // URLComponents leaves "+" as is, which the web reads back as a space.
+            components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
 
             error = nil
             phase = .waitingForBrowser
