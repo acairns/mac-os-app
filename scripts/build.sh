@@ -82,6 +82,8 @@ iconutil -c icns "$BUILD/icon/AppIcon.iconset" -o "$APP/Contents/Resources/AppIc
 
 if [[ -n "${APP_STORE_PROFILE:-}" ]]; then
     cp "$APP_STORE_PROFILE" "$APP/Contents/embedded.provisionprofile"
+    # The App Store rejects quarantined files, like the profile the browser downloaded.
+    xattr -dr com.apple.quarantine "$APP"
     codesign --force --timestamp --entitlements "$ROOT/DevNull.AppStore.entitlements" --sign "Apple Distribution" "$APP"
 elif [[ -n "${DEVELOPER_ID:-}" ]]; then
     codesign --force --options runtime --timestamp --entitlements "$ROOT/DevNull.entitlements" --sign "$DEVELOPER_ID" "$APP"
@@ -115,6 +117,7 @@ done
 if [[ -n "${APP_STORE_PROFILE:-}" ]]; then
     codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "com.apple.security.app-sandbox" \
         || fail "the sandbox entitlement is missing, so the App Store rejects the build"
+    [[ -z "$(xattr -lr "$APP" | grep com.apple.quarantine || true)" ]] || fail "a file in the app is quarantined, so the App Store rejects the build"
 
     productbuild --component "$APP" /Applications --sign "3rd Party Mac Developer Installer" "$BUILD/DevNull.pkg" >/dev/null
 
