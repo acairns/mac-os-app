@@ -7,7 +7,7 @@ import AppKit
 
 let output = URL(filePath: CommandLine.arguments[1])
 let isNotarized = CommandLine.arguments[2] == "1"
-let fonts = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../resources/fonts")
+let fonts = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../dev-null.sh/resources/fonts")
 
 for name in ["Geist-Regular", "Geist-SemiBold", "GeistMono-Regular"] {
     CTFontManagerRegisterFontsForURL(fonts.appending(path: "\(name).ttf") as CFURL, .process, nil)

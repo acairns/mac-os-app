@@ -12,7 +12,8 @@
 #       device key again after each update, but macOS asks people to approve the app the first time they open it.
 #   Neither: signed ad hoc, for trying a build on this Mac only.
 #
-# Needs Xcode (actool compiles the icon) and a git checkout (the build number is the commit count).
+# Needs Xcode (actool compiles the icon), a git checkout (the build number comes from the commit count) and the website
+# checked out beside this repository, at ../dev-null.sh.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -20,14 +21,15 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 BUILD="$ROOT/.build/package"
 APP="$BUILD/DevNull.app"
-DOWNLOADS="$ROOT/../public/downloads"
+DOWNLOADS="$ROOT/../dev-null.sh/public/downloads"
 DMG="$DOWNLOADS/DevNull.dmg"
 RELEASE="$DOWNLOADS/DevNull.json"
 VOLUME="DevNull"
 
 VERSION="$(plutil -extract CFBundleShortVersionString raw Info.plist)"
 MINIMUM_SYSTEM_VERSION="$(plutil -extract LSMinimumSystemVersion raw Info.plist)"
-BUILD_NUMBER="$(git rev-list --count HEAD)"
+# Builds up to 888 came from the website repository, so this one counts on from there and installed apps see an update.
+BUILD_NUMBER="$((888 + $(git rev-list --count HEAD)))"
 REVISION="$(git rev-parse --short=8 HEAD)"
 if [[ -n "$(git status --porcelain -- "$ROOT")" ]]; then
     REVISION="$REVISION-dirty"
