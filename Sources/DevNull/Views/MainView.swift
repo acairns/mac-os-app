@@ -196,7 +196,7 @@ struct SidebarView: View {
         if !inbox.search.isEmpty { return ("fatal: no remotes match “\(inbox.search)”", "Try a name or an @handle.") }
 
         return switch inbox.tab {
-        case .open: ("fatal: no remotes yet", "Press ⌘N to push to someone.")
+        case .open: ("no remotes yet", "Press ⌘N to push to someone.")
         case .fetched: ("fatal: nothing fetched", "No requests waiting.")
         case .stashed: ("fatal: stash is empty", "Stashed remotes land here.")
         }
