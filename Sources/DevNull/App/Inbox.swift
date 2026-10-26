@@ -241,11 +241,14 @@ final class Inbox {
 
     private func startPolling() {
         poller = Task { [weak self] in
+            var refreshedAt = Date.now
             while !Task.isCancelled {
-                let active = NSApp.isActive
-                try? await Task.sleep(for: .seconds(active ? 4 : 20))
+                try? await Task.sleep(for: .seconds(4))
                 guard let self, !Task.isCancelled else { return }
+                // Behind other windows, once a minute; back in front, within one tick.
+                guard NSApp.isActive || Date.now.timeIntervalSince(refreshedAt) >= 60 else { continue }
                 await self.refresh()
+                refreshedAt = .now
             }
         }
     }
