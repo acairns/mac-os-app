@@ -191,7 +191,7 @@ final class Inbox {
 
         guard (current.lastMessage?.id ?? 0) < message.id else { return }
 
-        let incoming = message.userId != session.user?.id && !message.isEvent
+        let incoming = message.userId != session.user?.id && (!message.isEvent || message.isPing)
         let updated = ConversationSummary(id: current.id, kind: current.kind, name: current.name, partner: current.partner, members: current.members, lastMessage: message, lastMessageAt: message.createdAt, ahead: current.ahead, lastIncomingMessageId: incoming ? message.id : current.lastIncomingMessageId, lastIncomingSender: current.lastIncomingSender, partnerReadThroughId: current.partnerReadThroughId, partnerReadAt: current.partnerReadAt, isArchived: current.isArchived, pinnedAt: current.pinnedAt, mutedUntilAt: current.mutedUntilAt)
 
         // Pinned conversations keep the order they were pinned in; the others move up to the first unpinned place.
@@ -277,14 +277,24 @@ final class Inbox {
 
             let content = UNMutableNotificationContent()
             let sender = conversation.lastIncomingSender ?? conversation.partner?.displayName ?? "Someone"
+            let pinged = conversation.lastMessage.map { $0.isPing && $0.userId != session.user?.id } ?? false
             content.title = conversation.isOrg ? (conversation.name ?? "Org") : sender
             // As on the web, alerts never carry the message itself.
-            content.body = conversation.isOrg ? "\(sender) sent a message" : "Sent you a message"
+            content.body = switch (pinged, conversation.isOrg) {
+            case (true, true): "\(sender) sent a ping"
+            case (true, false): "Pinged you"
+            case (false, true): "\(sender) sent a message"
+            case (false, false): "Sent you a message"
+            }
             content.threadIdentifier = conversation.id
             content.categoryIdentifier = "message"
             content.userInfo = ["conversation": conversation.id]
 
-            Sounds.newMessage()
+            if pinged {
+                Sounds.ping()
+            } else {
+                Sounds.newMessage()
+            }
 
             // The banner stays silent: the app plays the web's own sound itself.
             if Preferences.notificationsEnabled {

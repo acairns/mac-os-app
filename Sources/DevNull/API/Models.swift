@@ -202,6 +202,7 @@ struct Message: Codable, Hashable, Identifiable {
     let createdAt: Date
 
     var isEvent: Bool { event != nil }
+    var isPing: Bool { event == "ping" }
 }
 
 struct ConversationSummary: Codable, Hashable, Identifiable {

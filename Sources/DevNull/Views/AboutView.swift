@@ -210,9 +210,15 @@ private struct UpdateStatus: View {
             case .current:
                 Label("You're up to date.", systemImage: "checkmark.circle")
             case let .available(release):
-                Button("Get /dev/null \(release.version)") { NSWorkspace.shared.open(release.url) }
+                Button("Update to /dev/null \(release.version)") { updates.update(to: release) }
                     .buttonStyle(.dsPrimary)
-                    .accessibilityHint("Opens the download page in your browser")
+                    .accessibilityHint("Downloads and installs it, then reopens /dev/null")
+            case .installing:
+                HStack(spacing: DS.Spacing.m) {
+                    ProgressView().controlSize(.small)
+                    Text("Updating…")
+                }
+                .accessibilityElement(children: .combine)
             case .failed:
                 HStack(spacing: DS.Spacing.m) {
                     Text("Couldn't reach dev-null.sh.")

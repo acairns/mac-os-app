@@ -225,7 +225,18 @@ struct Composer: View {
             .popover(isPresented: $showsEmoji, arrowEdge: .top) {
                 EmojiPicker(mode: .insert) { emoji in handle.insert(emoji) }
             }
+
+            Button { thread.sendPing() } label: {
+                Image(systemName: "bell.and.waves.left.and.right")
+            }
+            .buttonStyle(IconButtonStyle(size: Self.iconSize))
+            .help(pingLabel)
+            .accessibilityLabel(pingLabel)
         }
+    }
+
+    private var pingLabel: String {
+        thread.partner.map { "Ping @" + $0.username } ?? "Ping everyone in the org"
     }
 
     private var isRecording: Bool {

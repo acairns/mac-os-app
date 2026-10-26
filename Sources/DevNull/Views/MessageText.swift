@@ -186,7 +186,7 @@ enum MessageText {
         return body
     }
 
-    /// What a logged org change says, from the reader's point of view, worded as the web words it.
+    /// What a logged org change or ping says, from the reader's point of view, worded as the web words it.
     static func eventText(_ message: Message, me: String?) -> String {
         func handle(_ user: User?) -> String {
             guard let user else { return "someone" }
@@ -207,6 +207,8 @@ enum MessageText {
         case "promoted": text = "\(actor) made \(subject) a maintainer"
         case "demoted": text = "\(actor) made \(subject) a contributor"
         case "inherited": text = "\(actor) inherited maintainer"
+        // Direct threads leave the author out: there, it can only be the partner.
+        case "ping": text = message.userId == me ? "you sent a ping" : message.user == nil ? "you got a ping" : "\(actor) sent a ping"
         default: text = body
         }
 

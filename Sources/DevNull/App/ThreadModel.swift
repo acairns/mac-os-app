@@ -385,9 +385,14 @@ final class ThreadModel {
 
         guard !fresh.isEmpty else { return }
 
-        // A message from someone else arriving in the open thread chimes, unless the thread is muted.
-        let chimes = isViewing && isLoaded && fresh.contains(where: { $0.userId != me && !$0.isEvent }) && !(mutedUntilAt.map { $0 > .now } ?? false)
-        if chimes {
+        // A message from someone else arriving in the open thread chimes, unless the thread is muted. A ping, coming
+        // in or going out, shakes the window instead.
+        let isMuted = mutedUntilAt.map { $0 > .now } ?? false
+        let pinged = isViewing && isLoaded && fresh.contains(where: { $0.isPing && ($0.userId == me || !isMuted) })
+        let chimes = !pinged && isViewing && isLoaded && fresh.contains(where: { $0.userId != me && !$0.isEvent }) && !isMuted
+        if pinged {
+            Sounds.ping()
+        } else if chimes {
             Sounds.newMessage()
         }
 
@@ -397,7 +402,7 @@ final class ThreadModel {
         messages.sort { $0.id < $1.id }
 
         if let last = messages.last, isLoaded {
-            inbox.showLocally(last, in: reference, alerted: chimes)
+            inbox.showLocally(last, in: reference, alerted: chimes || pinged)
         }
     }
 
@@ -478,6 +483,24 @@ final class ThreadModel {
         replyingTo = nil
 
         deliver(message)
+    }
+
+    /// Pings the partner, or everyone in an org, as the web's composer does. The ping lands in the thread like a message,
+    /// which shakes it.
+    func sendPing() {
+        noteActivity()
+
+        Task {
+            do {
+                let sent: DataEnvelope<Message> = try await api.send("POST", reference.path + "/ping", json: nil)
+                append([sent.data])
+                readThroughId = max(readThroughId, sent.data.id)
+            } catch let error as APIError where error.requiresSignIn {
+                inbox.session.expire(error)
+            } catch {
+                presentAlert(error.localizedDescription)
+            }
+        }
     }
 
     func retry(_ message: PendingMessage) {

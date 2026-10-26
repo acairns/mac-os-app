@@ -116,7 +116,8 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About /dev/null") { AboutWindow.show() }
             #if !APP_STORE
-                Button(Updates.shared.available.map { "Get /dev/null \($0.version)…" } ?? "Check for Updates…") { Updates.shared.checkFromMenu() }
+                Button(Updates.shared.isInstalling ? "Updating…" : Updates.shared.available.map { "Update to /dev/null \($0.version)…" } ?? "Check for Updates…") { Updates.shared.checkFromMenu() }
+                    .disabled(Updates.shared.isInstalling)
             #endif
         }
 

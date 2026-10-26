@@ -290,13 +290,17 @@ final class VoicePlayer {
 @MainActor
 enum Sounds {
     private static var lastPlayedAt = Date.distantPast
+    private static var lastPingedAt = Date.distantPast
 
-    private static let message: NSSound? = {
-        let file = Bundle.main.url(forResource: "remote", withExtension: "mp3")
-            ?? URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appending(path: "Resources/remote.mp3")
+    private static let message = sound("remote")
+    private static let pingSound = sound("ping")
+
+    private static func sound(_ name: String) -> NSSound? {
+        let file = Bundle.main.url(forResource: name, withExtension: "mp3")
+            ?? URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appending(path: "Resources/\(name).mp3")
 
         return NSSound(contentsOf: file, byReference: false)
-    }()
+    }
 
     static func newMessage() {
         guard Preferences.soundEnabled, Date().timeIntervalSince(lastPlayedAt) > 2 else { return }
@@ -309,5 +313,39 @@ enum Sounds {
         if !NSApp.isActive {
             NSApp.requestUserAttention(.informationalRequest)
         }
+    }
+
+    /// A ping coming in or going out: MSN's ping sound, and the window shakes like MSN's conversation window did.
+    static func ping() {
+        guard Date().timeIntervalSince(lastPingedAt) > 2 else { return }
+
+        lastPingedAt = Date()
+
+        if Preferences.soundEnabled {
+            pingSound?.stop()
+            pingSound?.play()
+        }
+
+        if !NSApp.isActive {
+            NSApp.requestUserAttention(.informationalRequest)
+        }
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }),
+              !window.styleMask.contains(.fullScreen)
+        else { return }
+
+        let origin = window.frame.origin
+        let path = CGMutablePath()
+        path.move(to: origin)
+        for offset in [-10.0, 10, -8, 8, -5, 5, 0] {
+            path.addLine(to: CGPoint(x: origin.x + offset, y: origin.y))
+        }
+
+        let shake = CAKeyframeAnimation()
+        shake.path = path
+        shake.duration = 0.5
+        window.animations = ["frameOrigin": shake]
+        window.animator().setFrameOrigin(origin)
     }
 }
