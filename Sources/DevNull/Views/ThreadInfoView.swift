@@ -39,7 +39,7 @@ struct ThreadInfoView: View {
         .sheet(isPresented: $showsAdd) {
             if let id = thread.orgId {
                 PeoplePicker(mode: .addToOrg(id: id)) { users, _, shareHistory in
-                    Task { await thread.add(users.map(\.username), shareHistory: shareHistory) }
+                    Task { await thread.add(users.map(\.handle), shareHistory: shareHistory) }
                 }
             }
         }
@@ -60,7 +60,7 @@ struct ThreadInfoView: View {
 
             HStack(spacing: DS.Spacing.s) {
                 Circle().fill(LaneColor.of(partner)).frame(width: 6, height: 6)
-                Text("@" + partner.username)
+                Text("@" + partner.handle)
                     .font(DS.Fonts.monoHandle)
                     .foregroundStyle(DS.Colors.inkMuted)
 
@@ -79,7 +79,7 @@ struct ThreadInfoView: View {
             }
 
             Button("View Profile on /dev/null") {
-                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.username))
+                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.handle))
             }
             .buttonStyle(.dsOutline)
             .padding(.top, DS.Spacing.l)
@@ -162,12 +162,12 @@ struct ThreadInfoView: View {
                     .font(DS.Fonts.bodyMedium)
                     .foregroundStyle(DS.Colors.ink)
                     .lineLimit(1)
-                Text("@" + member.user.username)
+                Text("@" + member.user.handle)
                     .font(DS.Fonts.monoHandle)
                     .foregroundStyle(DS.Colors.inkMuted)
                     .lineLimit(1)
             }
-            .help(member.user.displayName + " · @" + member.user.username)
+            .help(member.user.displayName + " · @" + member.user.handle)
 
             Spacer(minLength: DS.Spacing.m)
 

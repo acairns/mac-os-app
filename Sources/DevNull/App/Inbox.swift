@@ -378,7 +378,7 @@ final class Inbox {
     }
 
     func block(_ user: User) async {
-        await run { try await self.api.perform("POST", "users/\(user.username)/block") }
+        await run { try await self.api.perform("POST", "users/\(user.handle)/block") }
         selection = nil
     }
 

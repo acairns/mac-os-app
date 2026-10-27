@@ -163,7 +163,7 @@ struct ChatView: View {
             return thread.members.count == 1 ? "1 member" : "\(thread.members.count) members"
         }
 
-        return thread.partner.map { "@" + $0.username } ?? ""
+        return thread.partner.map { "@" + $0.handle } ?? ""
     }
 
     @ToolbarContentBuilder
@@ -243,10 +243,10 @@ struct ChatView: View {
                     Divider()
 
                     Button("View Profile", systemImage: "person.crop.circle") {
-                        NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.username))
+                        NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.handle))
                     }
 
-                    Button("Block @\(partner.username)…", systemImage: "hand.raised", role: .destructive) {
+                    Button("Block @\(partner.handle)…", systemImage: "hand.raised", role: .destructive) {
                         confirmBlock(partner)
                     }
                 } else if thread.role != nil {
@@ -267,7 +267,7 @@ struct ChatView: View {
 
     private func confirmBlock(_ partner: User) {
         let alert = NSAlert()
-        alert.messageText = "Block @\(partner.username)?"
+        alert.messageText = "Block @\(partner.handle)?"
         alert.informativeText = "They won't be able to push to you or see your commits. You can unblock them from their profile."
         alert.addButton(withTitle: "Block").hasDestructiveAction = true
         alert.addButton(withTitle: "Cancel")
@@ -373,7 +373,7 @@ struct ThreadIntro: View {
                     .font(DS.Fonts.section)
                     .foregroundStyle(DS.Colors.ink)
                     .lineLimit(1)
-                Text("@" + partner.username)
+                Text("@" + partner.handle)
                     .font(DS.Fonts.monoHandle)
                     .foregroundStyle(DS.Colors.inkMuted)
 

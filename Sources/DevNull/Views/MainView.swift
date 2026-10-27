@@ -53,7 +53,7 @@ struct MainView: View {
         do {
             let created: Created = try await inbox.api.send("POST", "remotes/orgs", json: [
                 "name": name.isEmpty ? NSNull() : name,
-                "members": users.map(\.username),
+                "members": users.map(\.handle),
             ])
 
             await inbox.refresh()
@@ -384,7 +384,7 @@ struct ConversationRow: View {
 
         if typing.count > 1 { return "\(typing.count) people are typing" }
 
-        let name = people.first { $0.username == typing.first }.map { firstName($0) } ?? typing.first ?? ""
+        let name = people.first { $0.handle == typing.first }.map { firstName($0) } ?? typing.first ?? ""
 
         return "\(name) is typing"
     }
@@ -438,7 +438,7 @@ struct ConversationRow: View {
     }
 
     private var help: String {
-        var lines = [conversation.partner.map { "\(title) · @\($0.username)" } ?? title]
+        var lines = [conversation.partner.map { "\(title) · @\($0.handle)" } ?? title]
 
         if receipt == .pulled, let pulledAt = conversation.partnerReadAt {
             lines.append("Pulled \(Formatting.pulledTime(pulledAt))")
@@ -494,7 +494,7 @@ struct CandidateSearchRow: View {
                     .foregroundStyle(isSelected ? DS.Colors.onPrimary : DS.Colors.ink)
                     .lineLimit(1)
 
-                Text(candidate.reason ?? "@" + candidate.user.username)
+                Text(candidate.reason ?? "@" + candidate.user.handle)
                     .font(candidate.reason == nil ? DS.Fonts.monoHandle : DS.Fonts.caption)
                     .foregroundStyle(isSelected ? DS.Colors.onPrimary.opacity(0.8) : DS.Colors.inkMuted)
                     .lineLimit(1)
@@ -502,7 +502,7 @@ struct CandidateSearchRow: View {
         }
         .padding(.vertical, 4)
         .opacity(candidate.reason == nil ? 1 : 0.5)
-        .help(candidate.reason.map { "@\(candidate.user.username) \($0)" } ?? "@" + candidate.user.username)
+        .help(candidate.reason.map { "@\(candidate.user.handle) \($0)" } ?? "@" + candidate.user.handle)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(candidate.reason.map { "\(candidate.user.displayName), unavailable: \($0)" } ?? "\(candidate.user.displayName), start a remote")
     }

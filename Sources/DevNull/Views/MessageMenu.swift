@@ -78,7 +78,7 @@ enum MessageMenu {
         if let reactions = message.reactions, !reactions.isEmpty {
             let item = NSMenuItem(title: reactions.count == 1 ? "1 Reaction" : "\(reactions.count) Reactions", action: nil, keyEquivalent: "")
             item.image = NSImage(systemSymbolName: "face.smiling", accessibilityDescription: nil)
-            item.submenu = peopleMenu(reactions.map { (thread.user($0.userId) ?? User(id: $0.userId, username: "someone", name: nil, avatarUrl: nil, bio: nil, htmlUrl: nil, lane: nil, isFollowed: nil, followsYou: nil), $0.emoji) })
+            item.submenu = peopleMenu(reactions.map { (thread.user($0.userId) ?? User(id: $0.userId, handle: "someone", name: nil, avatarUrl: nil, bio: nil, htmlUrl: nil, lane: nil, isFollowed: nil, followsYou: nil), $0.emoji) })
 
             if menu.items.count == receiptCount {
                 menu.addItem(.separator())
@@ -89,8 +89,8 @@ enum MessageMenu {
 
         if let sender = message.user ?? thread.user(message.userId), sender.id != me {
             menu.addItem(.separator())
-            menu.addItem(ActionItem("View @\(sender.username)", symbol: "person.crop.circle", key: "") {
-                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + sender.username))
+            menu.addItem(ActionItem("View @\(sender.handle)", symbol: "person.crop.circle", key: "") {
+                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + sender.handle))
             })
         }
 
@@ -103,14 +103,14 @@ enum MessageMenu {
 
         for (user, emoji) in people {
             let item = ActionItem((emoji.map { $0 + "  " } ?? "") + user.displayName, symbol: "person.crop.circle", key: "") {
-                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + user.username))
+                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + user.handle))
             }
 
             if let url = user.avatarURL, let avatar = ImageLoader.shared.cached(url) {
                 item.image = avatar.circular(diameter: 18)
             }
 
-            item.toolTip = "@" + user.username
+            item.toolTip = "@" + user.handle
             menu.addItem(item)
         }
 

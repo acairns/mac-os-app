@@ -19,12 +19,12 @@ struct SettingsView: View {
                                 .font(DS.Fonts.rowTitle)
                                 .foregroundStyle(DS.Colors.ink)
                                 .lineLimit(1)
-                            Text("@" + user.username)
+                            Text("@" + user.handle)
                                 .font(DS.Fonts.monoHandle)
                                 .foregroundStyle(DS.Colors.inkMuted)
                                 .lineLimit(1)
                         }
-                        .help(user.asUser.displayName + " · @" + user.username)
+                        .help(user.asUser.displayName + " · @" + user.handle)
                         Spacer()
                         Button("Sign Out") { session.signOut() }
                             .buttonStyle(.dsOutline)

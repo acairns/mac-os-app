@@ -236,7 +236,7 @@ struct Composer: View {
     }
 
     private var pingLabel: String {
-        thread.partner.map { "Ping @" + $0.username } ?? "Ping everyone in the org"
+        thread.partner.map { "Ping @" + $0.handle } ?? "Ping everyone in the org"
     }
 
     private var isRecording: Bool {
@@ -269,7 +269,7 @@ struct Composer: View {
 
     private var placeholder: String {
         if let partner = thread.partner {
-            return "Push to @\(partner.username)"
+            return "Push to @\(partner.handle)"
         }
 
         return "Push to the org"
@@ -301,9 +301,9 @@ struct Composer: View {
             let people = (thread.members.map(\.user) + [thread.partner].compactMap { $0 }).filter { $0.id != session.user?.id }
 
             return people
-                .filter { query.isEmpty || $0.username.lowercased().hasPrefix(query) || $0.displayName.lowercased().split(separator: " ").contains { $0.hasPrefix(query) } }
+                .filter { query.isEmpty || $0.handle.lowercased().hasPrefix(query) || $0.displayName.lowercased().split(separator: " ").contains { $0.hasPrefix(query) } }
                 .prefix(6)
-                .map { Suggestion(id: $0.id, title: $0.displayName, detail: "@" + $0.username, user: $0, emoji: nil, insertion: "@\($0.username) ") }
+                .map { Suggestion(id: $0.id, title: $0.displayName, detail: "@" + $0.handle, user: $0, emoji: nil, insertion: "@\($0.handle) ") }
         case let .emoji(query, _)?:
             let query = query.lowercased()
             let prefixed = Reactions.all.filter { $0.name.hasPrefix(query) }
