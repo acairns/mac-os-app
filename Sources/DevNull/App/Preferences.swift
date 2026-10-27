@@ -27,7 +27,7 @@ enum Preferences {
         }
     }
 
-    /// The conversation open when the app quit ("@username" or "org:id"), opened again on launch.
+    /// The conversation open when the app quit ("@handle" or "org:id"), opened again on launch.
     static var lastConversation: String? {
         get { defaults.string(forKey: "last-conversation") }
         set { defaults.set(newValue, forKey: "last-conversation") }

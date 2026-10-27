@@ -64,8 +64,8 @@ struct ChatRowView: View {
             MessageRow(thread: thread, message: message, layout: layout, status: status)
         case let .receipt(receipt):
             PullReceiptView(receipt: receipt)
-        case let .typing(usernames):
-            TypingRow(thread: thread, usernames: usernames)
+        case let .typing(handles):
+            TypingRow(thread: thread, handles: handles)
         case .end:
             // Breathing room between the last message and the composer.
             Color.clear.frame(height: 10)
@@ -128,7 +128,7 @@ struct MessageRow: View {
                     if layout.isLastInGroup {
                         Button { openProfile(sender) } label: { Avatar(user: sender, size: DS.Metrics.chatAvatar) }
                             .buttonStyle(.plain)
-                            .help("@" + (sender?.username ?? ""))
+                            .help("@" + (sender?.handle ?? ""))
                     } else {
                         Color.clear.frame(width: DS.Metrics.chatAvatar, height: 1)
                     }
@@ -195,7 +195,7 @@ struct MessageRow: View {
     private var reactions: [Reaction] { message.reactions ?? [] }
 
     private var bubble: some View {
-        let blocks = MessageText.blocks(message, mentioned: Set(mentionedUsernames), outgoing: outgoing)
+        let blocks = MessageText.blocks(message, mentioned: Set(mentionedHandles), outgoing: outgoing)
         let endsWithText = reactions.isEmpty && message.linkPreview == nil && {
             switch blocks.last {
             case .text?, .quote?: true
@@ -220,7 +220,7 @@ struct MessageRow: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
-                .help("@" + (sender?.username ?? ""))
+                .help("@" + (sender?.handle ?? ""))
                 .padding(.horizontal, onlyImages ? 10 : 0)
                 .padding(.top, onlyImages ? 6 : 0)
             }
@@ -409,12 +409,12 @@ struct MessageRow: View {
     }
 
     /// The people the message mentions, as the API found them, or the thread's people named in it while pending.
-    private var mentionedUsernames: [String] {
+    private var mentionedHandles: [String] {
         if let mentions = message.mentions {
-            return mentions.map { $0.username.lowercased() }
+            return mentions.map { $0.handle.lowercased() }
         }
 
-        let known = ([thread.partner, session.user?.asUser].compactMap { $0 } + thread.members.map(\.user)).map { $0.username.lowercased() }
+        let known = ([thread.partner, session.user?.asUser].compactMap { $0 } + thread.members.map(\.user)).map { $0.handle.lowercased() }
         let body = message.body ?? ""
 
         return known.filter { body.localizedCaseInsensitiveContains("@" + $0) }
@@ -476,7 +476,7 @@ struct MessageRow: View {
 
     private func openProfile(_ user: User?) {
         guard let user else { return }
-        NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + user.username))
+        NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + user.handle))
     }
 }
 
@@ -1007,7 +1007,7 @@ struct ReactionChips: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!thread.canPush)
-                .help(group.users.compactMap { thread.user($0).map { "@" + $0.username } }.joined(separator: ", "))
+                .help(group.users.compactMap { thread.user($0).map { "@" + $0.handle } }.joined(separator: ", "))
                 .accessibilityLabel("\(group.emoji), \(group.users.count) \(group.users.count == 1 ? "reaction" : "reactions")\(mine ? ", including yours" : "")")
                 .transition(.scale(scale: 0.4).combined(with: .opacity))
             }
@@ -1115,7 +1115,7 @@ struct PullReceiptView: View {
         .padding(.trailing, receipt.isOutgoing ? DS.Metrics.chatGutter + BubbleShape.tailWidth : 0)
         .padding(.top, 3)
         .padding(.bottom, 2)
-        .help(receipt.readers.map { "@" + $0.username }.joined(separator: ", "))
+        .help(receipt.readers.map { "@" + $0.handle }.joined(separator: ", "))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(receipt.pulledAt.map { "Pulled \(Formatting.pulledTime($0))" } ?? "Pulled by \(receipt.readers.map(\.displayName).joined(separator: ", "))")
     }
@@ -1138,12 +1138,12 @@ struct UnreadSeparator: View {
 /// Who is typing, as a bubble with bouncing dots under the last message, with their avatar in an org.
 struct TypingRow: View {
     let thread: ThreadModel
-    let usernames: [String]
+    let handles: [String]
 
     var body: some View {
         HStack(alignment: .bottom, spacing: DS.Metrics.chatAvatarGap) {
             if thread.isOrg {
-                Avatar(user: thread.members.first { $0.user.username == usernames.first }?.user, size: DS.Metrics.chatAvatar)
+                Avatar(user: thread.members.first { $0.user.handle == handles.first }?.user, size: DS.Metrics.chatAvatar)
             }
 
             TypingBubble()
@@ -1154,6 +1154,6 @@ struct TypingRow: View {
         .padding(.top, 7)
         .padding(.bottom, 2)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(usernames.count == 1 ? "@\(usernames[0]) is typing" : "\(usernames.count) people are typing")
+        .accessibilityLabel(handles.count == 1 ? "@\(handles[0]) is typing" : "\(handles.count) people are typing")
     }
 }

@@ -13,7 +13,7 @@
         }
 
         static var me: CurrentUser {
-            CurrentUser(id: "u-me", username: "you", name: "Preview You", avatarUrl: nil, htmlUrl: nil, lane: .palette(0), remotes: RemotesSettings(from: "following", pullReceipts: true, requests: true, everyone: true, unreadCount: 0))
+            CurrentUser(id: "u-me", handle: "you", name: "Preview You", avatarUrl: nil, htmlUrl: nil, lane: .palette(0), remotes: RemotesSettings(from: "following", pullReceipts: true, requests: true, everyone: true, unreadCount: 0))
         }
     }
 
@@ -193,17 +193,17 @@
 
         // MARK: Fixtures
 
-        private func uid(_ username: String) -> String {
-            username == "you" ? "u-me" : "u-\(username)"
+        private func uid(_ handle: String) -> String {
+            handle == "you" ? "u-me" : "u-\(handle)"
         }
 
-        private func user(_ username: String) -> [String: Any] {
-            let person = Self.people[username] ?? (username.capitalized, 0, "")
+        private func user(_ handle: String) -> [String: Any] {
+            let person = Self.people[handle] ?? (handle.capitalized, 0, "")
 
             return [
-                "id": uid(username), "username": username, "name": person.name, "bio": person.bio, "lane": person.lane,
-                "avatar_url": username == "you" ? NSNull() : "https://\(Preview.host)/avatar/\(username).png" as Any,
-                "html_url": "https://dev-null.sh/@\(username)", "is_followed": true, "follows_you": true,
+                "id": uid(handle), "handle": handle, "name": person.name, "bio": person.bio, "lane": person.lane,
+                "avatar_url": handle == "you" ? NSNull() : "https://\(Preview.host)/avatar/\(handle).png" as Any,
+                "html_url": "https://dev-null.sh/@\(handle)", "is_followed": true, "follows_you": true,
             ]
         }
 
@@ -211,11 +211,11 @@
             Date(timeIntervalSinceNow: -minutesAgo * 60).formatted(.iso8601)
         }
 
-        private func message(_ id: Int, _ username: String, _ body: String?, minutesAgo: Double, extra: [String: Any] = [:]) -> [String: Any] {
+        private func message(_ id: Int, _ handle: String, _ body: String?, minutesAgo: Double, extra: [String: Any] = [:]) -> [String: Any] {
             var message: [String: Any] = [
-                "id": id, "user_id": uid(username), "client_id": NSNull(), "body": nullable(body), "mentions": [],
+                "id": id, "user_id": uid(handle), "client_id": NSNull(), "body": nullable(body), "mentions": [],
                 "reply_to_id": NSNull(), "reactions": [], "event": NSNull(), "subject_id": NSNull(),
-                "user": user(username), "created_at": date(minutesAgo),
+                "user": user(handle), "created_at": date(minutesAgo),
             ]
             extra.forEach { message[$0.key] = $0.value }
             return message
@@ -275,7 +275,7 @@
                 ]]),
                 message(108, "lena", "Wrote it up: https://dev-null.sh/docs/design", minutesAgo: 60, extra: ["link_preview": ["url": "https://dev-null.sh/docs/design", "title": "Design — /dev/null", "description": "Tokens, type and the rules every screen keeps.", "image_url": "https://\(Preview.host)/img/9/1200x630.png", "site_name": "dev-null.sh"]]),
                 message(109, "theo", "🔥", minutesAgo: 59),
-                message(110, "you", "Love it. @maya can you review the dark palette next?", minutesAgo: 30, extra: ["mentions": [["username": "maya", "offset": 18, "length": 5]]]),
+                message(110, "you", "Love it. @maya can you review the dark palette next?", minutesAgo: 30, extra: ["mentions": [["handle": "maya", "offset": 18, "length": 5]]]),
                 message(111, "maya", "On it! Give me an hour.", minutesAgo: 28, extra: ["reply_to_id": 110, "reply_to": ["id": 110, "user_id": "u-me", "body": "Love it. @maya can you review the dark palette next?", "images_count": 0, "has_voice": false], "reactions": reactions([("you", "🙏"), ("rosa", "🙏"), ("theo", "😂")])]),
                 message(112, "maya", nil, minutesAgo: 5, extra: ["voice": ["id": "v-1", "duration_ms": 14000, "waveform": (0 ..< 48).map { Int(20 + 70 * abs(sin(Double($0) / 3.1))) }, "url": "https://\(Preview.host)/voice/v-1.wav"]]),
             ], readThrough: ["maya": 112, "theo": 110, "rosa": 109, "lena": 112, "you": 104], pinnedAt: date(10000))
@@ -443,7 +443,7 @@
         }
 
         private func currentUser() -> [String: Any] {
-            ["id": "u-me", "username": "you", "name": "Preview You", "avatar_url": NSNull(), "html_url": NSNull(), "lane": 0,
+            ["id": "u-me", "handle": "you", "name": "Preview You", "avatar_url": NSNull(), "html_url": NSNull(), "lane": 0,
              "remotes": ["from": "following", "pull_receipts": true, "requests": true, "everyone": true, "unread_count": 0]]
         }
 
@@ -601,13 +601,13 @@
             }
         }
 
-        private func deliver(_ key: String, from username: String) {
+        private func deliver(_ key: String, from handle: String) {
             nextId += 1
-            threads[key]?.messages.append(message(nextId, username, Self.replies.randomElement(), minutesAgo: 0))
+            threads[key]?.messages.append(message(nextId, handle, Self.replies.randomElement(), minutesAgo: 0))
             threads[key]?.typingUntil = nil
 
             // Whoever answers has read everything before.
-            threads[key]?.readThrough[username] = nextId
+            threads[key]?.readThrough[handle] = nextId
         }
 
         private func react(_ id: Int, emoji: String, remove: Bool) -> [[String: Any]] {
@@ -652,9 +652,9 @@
             (NSColor(hex: 0xC2255C), NSColor(hex: 0xFAA2C1)), (NSColor(hex: 0xB7791F), NSColor(hex: 0xFFD43B)),
         ]
 
-        static func avatar(_ username: String) -> Data {
-            let pair = colors[abs(username.hashValue % colors.count)]
-            let initial = String((PreviewStore.people[username]?.name ?? username).prefix(1))
+        static func avatar(_ handle: String) -> Data {
+            let pair = colors[abs(handle.hashValue % colors.count)]
+            let initial = String((PreviewStore.people[handle]?.name ?? handle).prefix(1))
 
             return draw(width: 160, height: 160, pair: pair) { rect in
                 let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 72, weight: .semibold), .foregroundColor: NSColor.white]

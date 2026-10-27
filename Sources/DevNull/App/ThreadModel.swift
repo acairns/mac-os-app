@@ -362,14 +362,14 @@ final class ThreadModel {
             set(\.partner, partner)
             set(\.partnerReadThroughId, max(partnerReadThroughId, thread.partnerReadThroughId ?? 0))
             set(\.partnerReadAt, thread.partnerReadAt)
-            set(\.typing, thread.partnerTyping == true ? [partner.username] : [])
+            set(\.typing, thread.partnerTyping == true ? [partner.handle] : [])
         }
 
         if let org = thread.org {
             set(\.orgName, org.name)
             set(\.members, thread.members ?? [])
             set(\.role, thread.role)
-            set(\.typing, (thread.typing ?? []).filter { $0 != inbox.session.user?.username })
+            set(\.typing, (thread.typing ?? []).filter { $0 != inbox.session.user?.handle })
         }
     }
 
@@ -432,7 +432,7 @@ final class ThreadModel {
     var canPush: Bool { access == .open }
 
     var accessNotice: String? {
-        let name = partner.map { "@" + $0.username } ?? "They"
+        let name = partner.map { "@" + $0.handle } ?? "They"
 
         switch access {
         case .open: return nil
@@ -629,18 +629,18 @@ final class ThreadModel {
         await poll()
     }
 
-    func add(_ usernames: [String], shareHistory: Bool) async {
-        await inbox.run { try await self.api.perform("POST", self.reference.path + "/members", json: ["members": usernames, "share_history": shareHistory]) }
+    func add(_ handles: [String], shareHistory: Bool) async {
+        await inbox.run { try await self.api.perform("POST", self.reference.path + "/members", json: ["members": handles, "share_history": shareHistory]) }
         await poll()
     }
 
     func setRole(_ role: OrgRole, of user: User) async {
-        await inbox.run { try await self.api.perform("PUT", self.reference.path + "/members/\(user.username)", json: ["role": role.rawValue]) }
+        await inbox.run { try await self.api.perform("PUT", self.reference.path + "/members/\(user.handle)", json: ["role": role.rawValue]) }
         await poll()
     }
 
     func remove(_ user: User) async {
-        await inbox.run { try await self.api.perform("DELETE", self.reference.path + "/members/\(user.username)") }
+        await inbox.run { try await self.api.perform("DELETE", self.reference.path + "/members/\(user.handle)") }
 
         if user.id == me {
             inbox.selection = nil

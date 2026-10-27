@@ -111,13 +111,13 @@ enum MessageText {
 
         if !mentioned.isEmpty, let regex = try? NSRegularExpression(pattern: "@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))") {
             for match in regex.matches(in: text, range: range) {
-                guard let usernameRange = Range(match.range(at: 1), in: text),
-                      mentioned.contains(text[usernameRange].lowercased()),
+                guard let handleRange = Range(match.range(at: 1), in: text),
+                      mentioned.contains(text[handleRange].lowercased()),
                       let swiftRange = Range(match.range, in: text),
                       let attributed = Range(swiftRange, in: result)
                 else { continue }
 
-                result[attributed].link = APIClient.baseURL.appending(path: "@" + text[usernameRange])
+                result[attributed].link = APIClient.baseURL.appending(path: "@" + text[handleRange])
                 result[attributed].foregroundColor = linkColor
                 result[attributed].font = .system(size: 14, weight: .semibold)
             }
@@ -190,7 +190,7 @@ enum MessageText {
     static func eventText(_ message: Message, me: String?) -> String {
         func handle(_ user: User?) -> String {
             guard let user else { return "someone" }
-            return user.id == me ? "you" : "@" + user.username
+            return user.id == me ? "you" : "@" + user.handle
         }
 
         let actor = handle(message.user)

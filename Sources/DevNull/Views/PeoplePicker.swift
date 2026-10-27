@@ -133,7 +133,7 @@ struct PeoplePicker: View {
                 ForEach(selected) { user in
                     HStack(spacing: DS.Spacing.xs) {
                         Avatar(user: user, size: 18)
-                        Text("@" + user.username)
+                        Text("@" + user.handle)
                             .font(DS.Fonts.monoHandle)
                             .foregroundStyle(DS.Colors.primary)
                         Button { selected.removeAll { $0.id == user.id } } label: {
@@ -142,7 +142,7 @@ struct PeoplePicker: View {
                                 .foregroundStyle(DS.Colors.primary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Remove @\(user.username)")
+                        .accessibilityLabel("Remove @\(user.handle)")
                     }
                     .padding(.leading, 3)
                     .padding(.trailing, DS.Spacing.s)
@@ -183,7 +183,7 @@ struct PeoplePicker: View {
 
     private func toggle(_ candidate: Candidate) {
         if let reason = candidate.reason {
-            presentAlert("@\(candidate.user.username) \(reason).")
+            presentAlert("@\(candidate.user.handle) \(reason).")
             return
         }
 
@@ -214,12 +214,12 @@ struct CandidateRow: View {
                     .font(DS.Fonts.bodyMedium)
                     .foregroundStyle(DS.Colors.ink)
                     .lineLimit(1)
-                Text(candidate.reason ?? "@" + candidate.user.username)
+                Text(candidate.reason ?? "@" + candidate.user.handle)
                     .font(candidate.reason == nil ? DS.Fonts.monoHandle : DS.Fonts.caption)
                     .foregroundStyle(DS.Colors.inkMuted)
                     .lineLimit(1)
             }
-            .help(candidate.reason.map { "@\(candidate.user.username) \($0)" } ?? "@" + candidate.user.username)
+            .help(candidate.reason.map { "@\(candidate.user.handle) \($0)" } ?? "@" + candidate.user.handle)
 
             Spacer(minLength: DS.Spacing.m)
 

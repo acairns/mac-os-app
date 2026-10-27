@@ -27,7 +27,7 @@ enum Lane: Codable, Hashable {
 
 struct User: Codable, Hashable, Identifiable {
     let id: String
-    let username: String
+    let handle: String
     let name: String?
     let avatarUrl: String?
     let bio: String?
@@ -38,7 +38,7 @@ struct User: Codable, Hashable, Identifiable {
 
     var displayName: String {
         guard let name, !name.trimmingCharacters(in: .whitespaces).isEmpty else {
-            return username
+            return handle
         }
 
         return name
@@ -59,7 +59,7 @@ struct RemotesSettings: Codable, Hashable {
 
 struct CurrentUser: Codable, Hashable {
     let id: String
-    let username: String
+    let handle: String
     let name: String?
     let avatarUrl: String?
     let htmlUrl: String?
@@ -67,7 +67,7 @@ struct CurrentUser: Codable, Hashable {
     let remotes: RemotesSettings?
 
     var asUser: User {
-        User(id: id, username: username, name: name, avatarUrl: avatarUrl, bio: nil, htmlUrl: htmlUrl, lane: lane, isFollowed: nil, followsYou: nil)
+        User(id: id, handle: handle, name: name, avatarUrl: avatarUrl, bio: nil, htmlUrl: htmlUrl, lane: lane, isFollowed: nil, followsYou: nil)
     }
 }
 
@@ -144,7 +144,7 @@ struct BodySegment: Codable, Hashable {
 }
 
 struct Mention: Codable, Hashable {
-    let username: String
+    let handle: String
     let offset: Int
     let length: Int
 }
@@ -290,7 +290,7 @@ enum ThreadReference: Hashable, Identifiable {
 
     var id: String {
         switch self {
-        case let .direct(user): "@" + user.username
+        case let .direct(user): "@" + user.handle
         case let .org(id, _): "org:" + id
         }
     }
@@ -306,7 +306,7 @@ enum ThreadReference: Hashable, Identifiable {
     /// The path of the thread under /api/v1/remotes.
     var path: String {
         switch self {
-        case let .direct(user): "remotes/@" + user.username
+        case let .direct(user): "remotes/@" + user.handle
         case let .org(id, _): "remotes/orgs/" + id
         }
     }
