@@ -1,3 +1,5 @@
 # Mac app guidelines
 
 - After any change here, rebuild with `scripts/build.sh` before finishing, signed and notarized like the published build: `DEVELOPER_ID=89A1DD63507AAD8592A9E56668F15A22AB42A939 NOTARY_PROFILE=devnull scripts/build.sh`. Check that `DevNull.json` says `"notarized": true` before finishing. It writes `public/downloads/DevNull.dmg` and `public/downloads/DevNull.json` into the website checkout at `../dev-null.sh`: leave both in that working tree to ship with the change, never restore or discard them.
+- Every build that replaces the published one ships under a new version: bump `CFBundleShortVersionString` in `Info.plist` before building, minor for new features and patch for fixes. Never publish a different build under a version that already shipped. The website's apps page and the app's update check read the version from `DevNull.json`, so check it there.
+- This repository is public. Never write anything private into code, comments, rules, tests, commit messages, or pull requests: secrets, credentials, personal data, private user content, or internal details of the production setup.
