@@ -34,7 +34,7 @@ final class Updates {
 
     static let shared = Updates()
 
-    nonisolated static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1"
+    nonisolated static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
     nonisolated static let build = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
     /// The commit the build was made from, stamped by build.sh.
     nonisolated static let revision = Bundle.main.object(forInfoDictionaryKey: "DevNullRevision") as? String

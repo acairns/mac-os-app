@@ -13,12 +13,7 @@ struct RootView: View {
             case .signedOut, .waitingForBrowser:
                 SignInView()
             case .signedIn:
-                if let inbox = session.inbox {
-                    MainView()
-                        .environment(inbox)
-                } else {
-                    Color.clear
-                }
+                SignedIn { WorkspaceView() }
             }
         }
         // Commit Blue is the app's one accent, whatever the system accent is: selection, links, toggles, focus.
@@ -27,6 +22,26 @@ struct RootView: View {
             #if DEBUG
                 PreviewAppearance.apply()
             #endif
+        }
+    }
+}
+
+/// A window's content once someone is signed in, with the inbox and the workspace it reads from. A window opened while
+/// signed out shows the sign-in screen.
+struct SignedIn<Content: View>: View {
+    @Environment(Session.self) private var session
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if session.phase == .signedIn, let inbox = session.inbox, let workspace = session.workspace {
+            content()
+                .environment(inbox)
+                .environment(workspace)
+                .tint(DS.Colors.primaryFill)
+        } else if session.phase == .loading {
+            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            SignInView()
         }
     }
 }

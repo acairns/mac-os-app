@@ -16,9 +16,38 @@ struct DevNullApp: App {
                 // The sign-in callback goes to the open window instead of opening another.
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: 1240, height: 780)
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands { AppCommands(session: session) }
+
+        // "Open in New Window" for a sidebar item: the same layout without the sidebar.
+        WindowGroup(id: "item", for: SidebarItem.self) { $item in
+            SignedIn { WorkspaceView(item: item, showsSidebar: false) }
+                .environment(session)
+                .frame(minWidth: 520, minHeight: 480)
+        }
+        .defaultSize(width: 900, height: 760)
+        .windowToolbarStyle(.unified(showsTitle: false))
+        .handlesExternalEvents(matching: [])
+
+        // "Open in New Window" for a commit page.
+        WindowGroup(id: "commit", for: String.self) { $id in
+            SignedIn { WorkspaceView(item: nil, route: id.map(Route.commit), showsSidebar: false) }
+                .environment(session)
+                .frame(minWidth: 520, minHeight: 480)
+        }
+        .defaultSize(width: 760, height: 760)
+        .windowToolbarStyle(.unified(showsTitle: false))
+        .handlesExternalEvents(matching: [])
+
+        Window("New Commit", id: "composer") {
+            SignedIn { CommitComposerWindow() }
+                .environment(session)
+                .frame(minWidth: 420, minHeight: 260)
+        }
+        .defaultSize(width: 560, height: 360)
+        .windowResizability(.contentMinSize)
+        .handlesExternalEvents(matching: [])
 
         Settings {
             SettingsView()
@@ -35,6 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     static var pendingConversation: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if Appearance.current != .system { Appearance.current.apply() }
+
         // The App Store updates its own build, and App Review rejects apps that check for updates themselves.
         #if !APP_STORE
             Updates.shared.start()
@@ -103,62 +134,4 @@ extension Notification.Name {
     static let showInfo = Notification.Name("devnull.showInfo")
     static let replyFromBanner = Notification.Name("devnull.replyFromBanner")
     static let markReadFromBanner = Notification.Name("devnull.markReadFromBanner")
-}
-
-struct AppCommands: Commands {
-    let session: Session
-
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some Commands {
-        let _ = AppDelegate.openMainWindow = { [openWindow] in openWindow(id: "main") }
-
-        CommandGroup(replacing: .appInfo) {
-            Button("About /dev/null") { AboutWindow.show() }
-            #if !APP_STORE
-                Button(Updates.shared.isInstalling ? "Updating…" : Updates.shared.available.map { "Update to /dev/null \($0.version)…" } ?? "Check for Updates…") { Updates.shared.checkFromMenu() }
-                    .disabled(Updates.shared.isInstalling)
-            #endif
-        }
-
-        CommandGroup(replacing: .newItem) {
-            Button("New Remote…") { NotificationCenter.default.post(name: .newRemote, object: nil) }
-                .keyboardShortcut("n")
-            Button("New Org…") { NotificationCenter.default.post(name: .newOrg, object: nil) }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-        }
-
-        CommandGroup(after: .textEditing) {
-            // ⌘K, Telegram's quick search.
-            Button("Search Remotes") { NotificationCenter.default.post(name: .focusSearch, object: nil) }
-                .keyboardShortcut("k")
-        }
-
-        CommandMenu("Conversation") {
-            Button("Show Info") { NotificationCenter.default.post(name: .showInfo, object: nil) }
-                .keyboardShortcut("i")
-
-            Divider()
-
-            // Moving between remotes from the keyboard, as Telegram does with ⌥↑ and ⌥↓.
-            Button("Previous Remote") { session.inbox?.selectAdjacent(-1) }
-                .keyboardShortcut(.upArrow, modifiers: .option)
-            Button("Next Remote") { session.inbox?.selectAdjacent(1) }
-                .keyboardShortcut(.downArrow, modifiers: .option)
-            Button("Next Remote") { session.inbox?.selectAdjacent(1) }
-                .keyboardShortcut(.tab, modifiers: .control)
-            Button("Previous Remote") { session.inbox?.selectAdjacent(-1) }
-                .keyboardShortcut(.tab, modifiers: [.control, .shift])
-
-            Divider()
-
-            Button("Jump to Newest Message") { NotificationCenter.default.post(name: .scrollToBottom, object: nil) }
-                .keyboardShortcut(.downArrow, modifiers: .command)
-        }
-
-        CommandGroup(replacing: .help) {
-            Button("/dev/null on the Web") { NSWorkspace.shared.open(APIClient.baseURL) }
-            Button("Manage Devices…") { NSWorkspace.shared.open(APIClient.baseURL.appending(path: "settings/devices")) }
-        }
-    }
 }

@@ -35,6 +35,16 @@ final class Inbox {
     private(set) var isLoadingMore = false
     var error: String?
 
+    /// The Open tab as the sidebar lists it, whichever tab or search All Remotes shows.
+    private(set) var sidebarOpen: [ConversationSummary] = []
+    /// Fetched requests, which the sidebar always lists, and how many remotes are stashed.
+    private(set) var requests: [ConversationSummary] = []
+    private(set) var stashedCount = 0
+    @ObservationIgnored private var extrasAt = Date.distantPast
+    /// The requests count the fetched tab was last loaded for; a new request reloads it at once.
+    @ObservationIgnored private var extrasRequestsCount: Int?
+    @ObservationIgnored private var sidebarAt = Date.distantPast
+
     /// Threads stay loaded while the app runs, so switching back to one is instant.
     @ObservationIgnored private var threads: [String: ThreadModel] = [:]
     @ObservationIgnored private var lastSeenIncoming: [String: Int] = [:]
@@ -136,7 +146,17 @@ final class Inbox {
             if unreadCount != unread { unreadCount = unread }
             if requestsCount != page.requestsCount { requestsCount = page.requestsCount }
             if error != nil { error = nil }
-            NSApp.dockTile.badgeLabel = unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : nil
+            session.workspace?.updateDockBadge()
+
+            if tab == .open, search.isEmpty {
+                if sidebarOpen != conversations { sidebarOpen = conversations }
+            } else if replacing || Date.now.timeIntervalSince(sidebarAt) > 30, let open: InboxPage = try? await api.get("remotes", query: ["tab": InboxTab.open.rawValue]) {
+                // The sidebar's open remotes while another tab or a search is showing, on the extras' cadence.
+                sidebarAt = .now
+                if open.data != sidebarOpen { sidebarOpen = open.data }
+            }
+
+            await refreshExtras(force: replacing)
 
             if replacing { prefetch() }
             restoreLastConversation()
@@ -153,6 +173,23 @@ final class Inbox {
         }
 
         if isLoading { isLoading = false }
+    }
+
+    /// The fetched and stashed tabs, for the sidebar's request rows and Stashed count: every 30 seconds, or at once when
+    /// the requests count changed.
+    private func refreshExtras(force: Bool) async {
+        guard force || Date.now.timeIntervalSince(extrasAt) > 30 || extrasRequestsCount != requestsCount else { return }
+
+        extrasAt = .now
+        extrasRequestsCount = requestsCount
+
+        if let fetched: InboxPage = try? await api.get("remotes", query: ["tab": InboxTab.fetched.rawValue]), fetched.data != requests {
+            requests = fetched.data
+        }
+
+        if let stashed: InboxPage = try? await api.get("remotes", query: ["tab": InboxTab.stashed.rawValue]), stashed.data.count != stashedCount {
+            stashedCount = stashed.data.count
+        }
     }
 
     /// Opens the conversation that was open when the app last quit, once the inbox lists it.
@@ -398,11 +435,21 @@ final class Inbox {
     func markLocallyRead(_ reference: ThreadReference, through: Int) {
         readLocally[reference.id] = max(readLocally[reference.id] ?? 0, through)
 
-        guard let index = conversations.firstIndex(where: { $0.reference.id == reference.id }), conversations[index].ahead > 0 else { return }
+        guard let index = conversations.firstIndex(where: { $0.reference.id == reference.id }), conversations[index].ahead > 0 else {
+            if let sidebarIndex = sidebarOpen.firstIndex(where: { $0.reference.id == reference.id }), sidebarOpen[sidebarIndex].ahead > 0 {
+                sidebarOpen[sidebarIndex] = sidebarOpen[sidebarIndex].with(ahead: 0)
+            }
+            return
+        }
 
         unreadCount = max(0, unreadCount - conversations[index].ahead)
         conversations[index] = conversations[index].with(ahead: 0)
-        NSApp.dockTile.badgeLabel = unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : nil
+
+        if let sidebarIndex = sidebarOpen.firstIndex(where: { $0.reference.id == reference.id }) {
+            sidebarOpen[sidebarIndex] = sidebarOpen[sidebarIndex].with(ahead: 0)
+        }
+
+        session.workspace?.updateDockBadge()
     }
 
     /// Starts loading a thread the pointer rests on, so it is there by the time it is clicked. The pointer has to stay

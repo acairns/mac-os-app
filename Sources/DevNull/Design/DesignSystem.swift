@@ -77,6 +77,18 @@ enum DS {
         static let onPrimary = Color.white
         static let destructive = Color(nsColor: .dynamic(light: 0xC92A2A, dark: 0xFF6B6B))
 
+        /// The sidebar when the system's vibrant material is off (Increase Contrast, Reduce Transparency), and what
+        /// stacked avatars knock out against there.
+        static let sidebar = Color(nsColor: .dynamic(light: 0xF1F2F4, dark: 0x1C1C1F))
+        /// The commit row whose thread is open in the replies pane.
+        static let selectionSoft = primarySoft
+        /// The j/k focus ring and keyboard focus.
+        static let focusRing = Color(nsColor: .primaryFill).opacity(0.5)
+        /// Moderation status labels on the user's own pending or rejected commits, always beside a word: lane 1's green
+        /// and lane 5's ochre, never marking a person.
+        static let success = lane(1)
+        static let warning = lane(5)
+
         static let chat = Color(nsColor: .dynamic(light: 0xEEF0F2, dark: 0x111112))
         static let bubbleOutgoing = Color(nsColor: .dynamic(light: 0x3B6FE0, dark: 0x2F5BC4))
         static let bubbleIncoming = Color(nsColor: .dynamic(light: 0xFFFFFF, dark: 0x232326))
@@ -132,6 +144,23 @@ enum DS {
         static let monoBadge = Font.system(size: 11, weight: .semibold, design: .monospaced).monospacedDigit()
         /// `fatal:` lines in empty states.
         static let monoFatal = Font.system(size: 12, weight: .medium, design: .monospaced)
+
+        /// Commit bodies in the log, Starred, profiles and search; set with `commitLineSpacing`.
+        static let commitBody = Font.system(size: 14)
+        /// The commit at the top of the replies pane and on the commit page; set with `commitLineSpacing`.
+        static let threadBody = Font.system(size: 15)
+        static let replyBody = Font.system(size: 13.5)
+        static let commitLineSpacing: CGFloat = 3
+        /// The author's name in a commit header.
+        static let commitAuthor = Font.system(size: 13, weight: .semibold)
+        static let sidebarItem = Font.system(size: 13)
+        static let sidebarItemUnread = Font.system(size: 13, weight: .semibold)
+        /// "Logs", "Remotes", "You", in `inkFaint`.
+        static let sidebarSection = Font.system(size: 11.5, weight: .semibold)
+        /// The "/dev/null" workspace name, tracked −0.5.
+        static let workspace = Font.system(size: 16, weight: .bold)
+        static let toolbarTitle = Font.system(size: 13.5, weight: .semibold)
+        static let profileName = title
     }
 
     // MARK: Spacing, radii, metrics
@@ -181,6 +210,32 @@ enum DS {
         static let chatAvatar: CGFloat = 32
         static let chatAvatarGap: CGFloat = 6
         static let reactionHeight: CGFloat = 22
+
+        // The workspace: the graph rail, commit rows, the sidebar and the overlays.
+
+        /// The rail column of every commit row.
+        static let railWidth: CGFloat = 44
+        static let railLine: CGFloat = 2
+        /// A graph node: a 2pt lane ring around a shell hole.
+        static let node: CGFloat = 14
+        /// The node's top in a commit row, so its center sits at y = 22, level with the avatar's.
+        static let nodeTop: CGFloat = 15
+        static let commitAvatar: CGFloat = 36
+        static let threadAvatar: CGFloat = 40
+        static let replyAvatar: CGFloat = 28
+        /// The hollow node of a notification, holding a 14pt type icon.
+        static let notificationNode: CGFloat = 32
+        static let sidebarRow: CGFloat = 28
+        static let sidebarAvatar: CGFloat = 18
+        /// Commit text never runs wider than this, however wide the column.
+        static let readingMeasure: CGFloat = 640
+        static let commitGutter: CGFloat = 16
+        /// The body and actions sit under the name: the 36pt avatar and its 8pt gap.
+        static let bodyIndent: CGFloat = 44
+        static let previewWidth: CGFloat = 304
+        static let switcherWidth: CGFloat = 560
+        static let activityCell: CGFloat = 10
+        static let activityGap: CGFloat = 2
     }
 
     // MARK: Motion
