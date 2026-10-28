@@ -938,14 +938,24 @@ struct ComposerTextView: NSViewRepresentable {
         weak var coordinator: Coordinator?
 
         /// ⌘↩ reaches the menu bar before the text view, so a commit composer takes it here while it has the focus.
+        /// Bare key equivalents are delivered to the composer so global shortcuts cannot swallow typed text.
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
             if let parent = coordinator?.parent, parent.submitsOnCommandReturn, window?.firstResponder === self,
-               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.keyCode == 36 || event.keyCode == 76 {
+               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+               (event.keyCode == 36 || event.keyCode == 76) {
                 parent.onSubmit()
                 return true
             }
 
-            return super.performKeyEquivalent(with: event)
+            let commandModifiers: NSEvent.ModifierFlags = [.command, .control, .function]
+            guard event.modifierFlags.intersection(commandModifiers).isEmpty,
+                  let characters = event.characters,
+                  !characters.isEmpty else {
+                return super.performKeyEquivalent(with: event)
+            }
+
+            keyDown(with: event)
+            return true
         }
 
         override func paste(_ sender: Any?) {
