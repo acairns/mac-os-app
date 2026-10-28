@@ -48,12 +48,9 @@ struct PageTabs<Tab: Hashable & Identifiable>: View {
 
 // MARK: - Commit lists
 
-/// A list of commits on the rail with paging, the j/k focus and Return, for Starred, profile tabs and search results.
+/// A list of commits on the rail with paging, for Starred, profile tabs and search results.
 struct CommitList<Header: View, Empty: View>: View {
     @Environment(Workspace.self) private var workspace
-    @Environment(Navigation.self) private var navigation
-    @Environment(\.workspaceActions) private var actions
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let ids: [String]
     var isLoading = false
@@ -64,90 +61,44 @@ struct CommitList<Header: View, Empty: View>: View {
 
     @State private var highlight = RailHighlight()
     @State private var width: CGFloat = 800
-    @FocusState private var focused: Bool
 
     var body: some View {
         let commits = ids.compactMap { workspace.existingBox($0) }.filter { !$0.isRemoved }
 
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    header()
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                header()
 
-                    if isLoading, commits.isEmpty {
-                        ForEach(0 ..< 5, id: \.self) { _ in SkeletonCommitRow() }
-                    } else if commits.isEmpty {
-                        empty()
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, DS.Spacing.xxl)
-                    } else {
-                        ForEach(Array(commits.enumerated()), id: \.element.id) { index, box in
-                            let previous = index > 0 ? commits[index - 1] : nil
+                if isLoading, commits.isEmpty {
+                    ForEach(0 ..< 5, id: \.self) { _ in SkeletonCommitRow() }
+                } else if commits.isEmpty {
+                    empty()
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, DS.Spacing.xxl)
+                } else {
+                    ForEach(Array(commits.enumerated()), id: \.element.id) { index, box in
+                        let previous = index > 0 ? commits[index - 1] : nil
 
-                            CommitRow(box: box, above: previous.map { (LaneColor.of($0.commit.author), $0.commit.author?.id) } ?? (DS.Colors.rail, nil), showsHash: width >= 520, hasTail: index < commits.count - 1 || hasMore)
-                        }
+                        CommitRow(box: box, above: previous.map { (LaneColor.of($0.commit.author), $0.commit.author?.id) } ?? (DS.Colors.rail, nil), showsHash: width >= 520, hasTail: index < commits.count - 1 || hasMore)
+                    }
 
-                        if hasMore {
-                            SkeletonCommitRow()
-                                .onAppear { Task { await loadMore() } }
-                        }
+                    if hasMore {
+                        SkeletonCommitRow()
+                            .onAppear { Task { await loadMore() } }
                     }
                 }
-                .padding(.bottom, DS.Spacing.xl)
             }
-            .background(DS.Colors.surface)
-            .background {
-                GeometryReader { geometry in
-                    Color.clear
-                        .onAppear { width = geometry.size.width }
-                        .onChange(of: geometry.size.width) { _, value in width = value }
-                }
-            }
-            .focusable()
-            .focusEffectDisabled()
-            .focused($focused)
-            .onKeyPress(phases: .down) { press in
-                guard press.modifiers.subtracting(.shift).isEmpty else { return .ignored }
-
-                if ListKeys.handle(press, navigation: navigation, actions: actions) == .handled { return .handled }
-
-                switch press.key {
-                case "j": move(1, in: commits, proxy: proxy)
-                case "k": move(-1, in: commits, proxy: proxy)
-                case "K":
-                    guard let id = navigation.focusedRow else { return .ignored }
-                    NotificationCenter.default.post(name: .showUserPreview, object: id)
-                case .return:
-                    guard let id = navigation.focusedRow else { return .ignored }
-                    navigation.push(.commit(id))
-                case .escape:
-                    guard navigation.isPaneVisible || navigation.focusedRow != nil else { return .ignored }
-                    if navigation.isPaneVisible { navigation.closePane() } else { navigation.focusedRow = nil }
-                default:
-                    return .ignored
-                }
-
-                return .handled
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .moveFocus)) { note in
-                if let step = note.object as? Int { move(step, in: commits, proxy: proxy) }
+            .padding(.bottom, DS.Spacing.xl)
+        }
+        .background(DS.Colors.surface)
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { width = geometry.size.width }
+                    .onChange(of: geometry.size.width) { _, value in width = value }
             }
         }
         .environment(highlight)
-        .onChange(of: focused) { _, value in navigation.listHasFocus = value }
-    }
-
-    private func move(_ step: Int, in commits: [CommitBox], proxy: ScrollViewProxy) {
-        let ids = commits.map(\.id)
-
-        guard !ids.isEmpty else { return }
-
-        let current = navigation.focusedRow.flatMap { ids.firstIndex(of: $0) }
-        let next = current.map { max(0, min(ids.count - 1, $0 + step)) } ?? 0
-        navigation.focusedRow = ids[next]
-        focused = true
-
-        withAnimation(DS.Motion.respecting(reduceMotion, DS.Motion.quick)) { proxy.scrollTo(ids[next], anchor: .center) }
     }
 }
 

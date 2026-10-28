@@ -125,12 +125,8 @@ final class Navigation {
     var pane: PaneTarget?
     /// Whether the user wants the replies pane shown, which survives switching items.
     var isPaneVisible = false
-    /// The commit row the keyboard is on (j/k), by commit id.
+    /// The commit row last clicked, by commit id.
     var focusedRow: String?
-    /// Whether a commit list has keyboard focus, so single-letter commands may fire.
-    var listHasFocus = false
-    /// A `g` chord waits for its second key, so the menu's single-letter commands stand aside.
-    var isChordPending = false
     /// Where the pane's reply composer should take the focus as soon as it shows.
     var focusReplyComposer = false
     /// The row each log was scrolled to, so coming back to a log finds the place it was left at.

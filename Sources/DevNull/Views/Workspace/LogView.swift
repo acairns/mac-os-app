@@ -7,17 +7,14 @@ struct LogView: View {
     @Environment(Workspace.self) private var workspace
     @Environment(Navigation.self) private var navigation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.workspaceActions) private var actions
 
     let kind: LogKind
 
     @State private var highlight = RailHighlight()
-    @State private var composer = ComposerHandle()
     @State private var isRestored = false
     /// The row at the top of the view, which polling keeps in place when arrivals are inserted above.
     @State private var anchor: String?
     @State private var width: CGFloat = 800
-    @FocusState private var listFocused: Bool
 
     private var log: LogStore { workspace.log(kind) }
 
@@ -30,7 +27,7 @@ struct LogView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    CommitComposer(presentation: .staged, draft: Bindable(workspace.drafts).commit, isRestored: isRestored, handle: composer)
+                    CommitComposer(presentation: .staged, draft: Bindable(workspace.drafts).commit, isRestored: isRestored)
                         .id(Self.top)
 
                     content
@@ -60,21 +57,12 @@ struct LogView: View {
             }
             .animation(DS.Motion.respecting(reduceMotion, DS.Motion.standard), value: log.commits.map(\.id))
             .animation(DS.Motion.respecting(reduceMotion, DS.Motion.standard), value: showsNewCommits)
-            .focusable()
-            .focusEffectDisabled()
-            .focused($listFocused)
-            .onKeyPress(phases: .down) { press in handleKey(press, proxy: proxy) }
-            .onReceive(NotificationCenter.default.publisher(for: .moveFocus)) { note in
-                guard let step = note.object as? Int else { return }
-                moveFocus(step, proxy: proxy)
-            }
         }
         .environment(highlight)
         .onAppear {
             isRestored = !workspace.drafts.commit.isEmpty
             log.open()
         }
-        .onChange(of: listFocused) { _, focused in navigation.listHasFocus = focused }
         // Trending is drawn again on each open, so only Following and Latest come back to where they were.
         .onChange(of: anchor) { _, anchor in if kind != .trending { navigation.logAnchors[kind] = anchor } }
         // Seeing the top of the log moves HEAD@{last visit}; the marker itself stays where it was on opening.
@@ -209,55 +197,6 @@ struct LogView: View {
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityLabel("\(log.unseen.count) new commits. Scroll to the newest.")
         }
-    }
-
-    // MARK: Keyboard
-
-    private func handleKey(_ press: KeyPress, proxy: ScrollViewProxy) -> KeyPress.Result {
-        guard press.modifiers.subtracting(.shift).isEmpty else { return .ignored }
-
-        if ListKeys.handle(press, navigation: navigation, actions: actions) == .handled { return .handled }
-
-        switch press.key {
-        case "j":
-            moveFocus(1, proxy: proxy)
-        case "k":
-            moveFocus(-1, proxy: proxy)
-        case "K":
-            guard let id = navigation.focusedRow else { return .ignored }
-            NotificationCenter.default.post(name: .showUserPreview, object: id)
-        case "c":
-            proxy.scrollTo(Self.top, anchor: .top)
-            composer.focus()
-        case .return:
-            guard let id = navigation.focusedRow else { return .ignored }
-            navigation.push(.commit(id))
-        case .escape:
-            if navigation.isPaneVisible {
-                navigation.closePane()
-            } else if navigation.focusedRow != nil {
-                navigation.focusedRow = nil
-            } else {
-                return .ignored
-            }
-        default:
-            return .ignored
-        }
-
-        return .handled
-    }
-
-    private func moveFocus(_ step: Int, proxy: ScrollViewProxy) {
-        let ids = log.commits.map(\.id)
-
-        guard !ids.isEmpty else { return }
-
-        let current = navigation.focusedRow.flatMap { ids.firstIndex(of: $0) }
-        let next = current.map { max(0, min(ids.count - 1, $0 + step)) } ?? 0
-        navigation.focusedRow = ids[next]
-        listFocused = true
-
-        withAnimation(DS.Motion.respecting(reduceMotion, DS.Motion.quick)) { proxy.scrollTo(ids[next], anchor: .center) }
     }
 }
 

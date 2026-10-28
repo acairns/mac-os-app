@@ -18,7 +18,6 @@ struct WorkspaceView: View {
     @State private var showsNewRemote = false
     @State private var showsNewOrg = false
     @State private var showsSwitcher = false
-    @State private var showsShortcuts = false
     @State private var toolbarSearch = ""
     @State private var toolbarSearchFocused = false
     let showsSidebar: Bool
@@ -64,7 +63,6 @@ struct WorkspaceView: View {
                 Task { await createOrg(users, name: name) }
             }
         }
-        .sheet(isPresented: $showsShortcuts) { KeyboardShortcutsSheet() }
         .onChange(of: navigation.item, initial: true) { _, item in syncInbox(item) }
         .onChange(of: inbox.selection) { _, selection in
             // A banner, Mark as Pulled or the last remote reopened on launch picks a remote for the frontmost window.
@@ -201,7 +199,6 @@ struct WorkspaceView: View {
         WorkspaceActions(
             togglePane: togglePane,
             showSwitcher: { showsSwitcher = true },
-            showShortcuts: { showsShortcuts = true },
             openProfile: openProfile,
             openCommitWindow: { openWindow(id: "commit", value: $0) },
             openItemWindow: { openWindow(id: "item", value: $0) }
@@ -296,12 +293,8 @@ struct WorkspaceView: View {
             case "settings":
                 UserDefaults.standard.set(argument.isEmpty ? "general" : argument, forKey: "settings-tab")
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            case "focus":
-                NotificationCenter.default.post(name: .moveFocus, object: argument == "k" ? -1 : 1)
             case "pane":
                 togglePane()
-            case "shortcuts":
-                showsShortcuts = true
             case "back":
                 navigation.back()
             case "compose":
@@ -517,7 +510,6 @@ struct WindowReader: NSViewRepresentable {
 struct WorkspaceActions {
     let togglePane: () -> Void
     let showSwitcher: () -> Void
-    let showShortcuts: () -> Void
     let openProfile: (String) -> Void
     let openCommitWindow: (String) -> Void
     let openItemWindow: (SidebarItem) -> Void
@@ -545,7 +537,6 @@ extension FocusedValues {
 
 extension Notification.Name {
     static let openProfile = Notification.Name("devnull.openProfile")
-    static let moveFocus = Notification.Name("devnull.moveFocus")
 }
 
 /// A key cap, as the web draws shortcuts: a bordered mono label.

@@ -266,12 +266,12 @@ struct AppCommands: Commands {
         }
 
         CommandMenu("Commit") {
-            commitButton("Reply", .reply, key: "r")
-            commitButton("Quote…", .quote, key: "q")
-            commitButton(isStarred ? "Unstar" : "Star", .star, key: "s")
-            commitButton("Show Replies", .showReplies, key: "o")
+            commitButton("Reply", .reply)
+            commitButton("Quote…", .quote)
+            commitButton(isStarred ? "Unstar" : "Star", .star)
+            commitButton("Show Replies", .showReplies)
             commitButton("Open Commit Page", .openPage, key: .return, modifiers: [.command, .shift])
-            commitButton("Copy Link", .copyLink, key: "y")
+            commitButton("Copy Link", .copyLink)
 
             Divider()
 
@@ -333,8 +333,6 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Button("Keyboard Shortcuts") { actions?.showShortcuts() }
-                .keyboardShortcut("/", modifiers: .shift)
             Button("/dev/null on the Web") { NSWorkspace.shared.open(APIClient.baseURL) }
 
             // Moderation and Operations stay on the web; admins get a way there.
@@ -367,13 +365,12 @@ struct AppCommands: Commands {
         return (inbox.sidebarOpen + inbox.conversations + inbox.requests).first { $0.reference == reference }
     }
 
-    /// A single-letter command only fires while a commit list has the keyboard, never inside a text field.
     private func commitButton(_ title: String, _ command: CommitCommand, key: KeyEquivalent? = nil, modifiers: EventModifiers = []) -> some View {
         let button = Button(title) {
             guard let id = focusedId, let workspace = session.workspace else { return }
             CommitCommand.perform(command, on: id, workspace: workspace, navigation: navigation, actions: actions, openWindow: openWindow)
         }
-        .disabled(focusedId == nil || (modifiers.isEmpty && key != nil && (navigation?.listHasFocus != true || navigation?.isChordPending == true)))
+        .disabled(focusedId == nil)
 
         return Group {
             if let key {

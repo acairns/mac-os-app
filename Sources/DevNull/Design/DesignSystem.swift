@@ -82,7 +82,7 @@ enum DS {
         static let sidebar = Color(nsColor: .dynamic(light: 0xF1F2F4, dark: 0x1C1C1F))
         /// The commit row whose thread is open in the replies pane.
         static let selectionSoft = primarySoft
-        /// The j/k focus ring and keyboard focus.
+        /// The focus ring and keyboard focus.
         static let focusRing = Color(nsColor: .primaryFill).opacity(0.5)
         /// Moderation status labels on the user's own pending or rejected commits, always beside a word: lane 1's green
         /// and lane 5's ochre, never marking a person.

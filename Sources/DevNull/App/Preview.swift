@@ -84,7 +84,7 @@
                 } else {
                     PreviewStore.shared.update = argument
                 }
-            case "item", "thread", "profile", "commit", "switcher", "composer", "settings", "focus", "results", "pane", "shortcuts", "back", "compose", "submit", "rm", "undo":
+            case "item", "thread", "profile", "commit", "switcher", "composer", "settings", "results", "pane", "back", "compose", "submit", "rm", "undo":
                 // The workspace commands act on the frontmost window's navigation, which listens for them.
                 NotificationCenter.default.post(name: .previewWorkspaceAction, object: command)
             case "appearance":
