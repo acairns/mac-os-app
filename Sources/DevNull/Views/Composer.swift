@@ -920,6 +920,22 @@ struct ComposerTextView: NSViewRepresentable {
     final class SubmittingTextView: NSTextView {
         weak var coordinator: Coordinator?
 
+        /// A bare key equivalent is offered to menu items before AppKit delivers it to the first responder. Keep
+        /// unmodified text input in the composer, so a global shortcut such as `g` or `c` cannot swallow a letter.
+        /// Command and Control combinations still go through the normal menu path (for Copy, Paste, and navigation).
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            let commandModifiers: NSEvent.ModifierFlags = [.command, .control, .function]
+
+            guard event.modifierFlags.intersection(commandModifiers).isEmpty,
+                  let characters = event.characters,
+                  !characters.isEmpty else {
+                return super.performKeyEquivalent(with: event)
+            }
+
+            keyDown(with: event)
+            return true
+        }
+
         override func paste(_ sender: Any?) {
             let pasteboard = NSPasteboard.general
 
