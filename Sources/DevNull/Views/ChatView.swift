@@ -9,7 +9,6 @@ struct ChatView: View {
     @State private var chat = ChatState()
     @State private var atBottom = true
     @State private var newBelow = 0
-    @State private var showsInfo = false
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -38,7 +37,7 @@ struct ChatView: View {
                 )
                 .overlay {
                     if !thread.isLoaded {
-                        DelayedSpinner()
+                        ChatSkeleton()
                     } else if let error = thread.error, thread.messages.isEmpty {
                         EmptyState(fatal: "fatal: could not fetch the thread", message: error)
                     }
@@ -93,14 +92,10 @@ struct ChatView: View {
             thread.markRead()
             Task { await thread.pollIfStale() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .showInfo)) { _ in showsInfo = true }
         .onReceive(NotificationCenter.default.publisher(for: .scrollToBottom)) { _ in chat.list.scrollToBottom() }
         #if DEBUG
             .onReceive(NotificationCenter.default.publisher(for: .previewChatAction)) { note in previewAction(note.object as? String) }
         #endif
-        .sheet(isPresented: $showsInfo) {
-            ThreadInfoView(thread: thread)
-        }
         .sheet(isPresented: Binding(get: { !thread.attachments.isEmpty }, set: { if !$0 { thread.attachments = [] } })) {
             AttachmentSheet(thread: thread)
         }
@@ -170,7 +165,7 @@ struct ChatView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             Button {
-                showsInfo = true
+                NotificationCenter.default.post(name: .showInfo, object: nil)
             } label: {
                 HStack(spacing: 10) {
                     Group {
@@ -211,14 +206,12 @@ struct ChatView: View {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            Spacer()
-
             Button {
-                showsInfo = true
+                NotificationCenter.default.post(name: .showInfo, object: nil)
             } label: {
                 Label("Info", systemImage: "info.circle")
             }
-            .help("Show info (⌘I)")
+            .help("Show Info (⌘I)")
 
             Menu {
                 Button(thread.pinnedAt == nil ? "Pin" : "Unpin", systemImage: "pin") {
@@ -243,7 +236,7 @@ struct ChatView: View {
                     Divider()
 
                     Button("View Profile", systemImage: "person.crop.circle") {
-                        NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.handle))
+                        NotificationCenter.default.post(name: .openProfile, object: partner.handle)
                     }
 
                     Button("Block @\(partner.handle)…", systemImage: "hand.raised", role: .destructive) {
@@ -332,18 +325,29 @@ struct ScrollDownButton: View {
     }
 }
 
-/// A spinner that only shows when loading takes long enough to notice, so fast loads show nothing at all.
-struct DelayedSpinner: View {
-    @State private var visible = false
+/// A thread's shape while its messages load: a few bubbles on both sides, along the bottom where the newest land.
+struct ChatSkeleton: View {
+    private static let bubbles: [(outgoing: Bool, width: CGFloat, height: CGFloat)] = [
+        (false, 220, 34), (false, 300, 52), (true, 180, 34), (true, 260, 34), (false, 240, 34),
+    ]
 
     var body: some View {
-        ProgressView()
-            .controlSize(.small)
-            .opacity(visible ? 1 : 0)
-            .task {
-                try? await Task.sleep(for: .milliseconds(300))
-                withAnimation(.easeIn(duration: 0.15)) { visible = true }
+        VStack(spacing: 6) {
+            Spacer(minLength: 0)
+
+            ForEach(Self.bubbles.indices, id: \.self) { index in
+                let bubble = Self.bubbles[index]
+
+                RoundedRectangle(cornerRadius: DS.Radius.bubble, style: .continuous)
+                    .fill(bubble.outgoing ? DS.Colors.bubbleOutgoing.opacity(0.25) : DS.Colors.bubbleIncoming)
+                    .frame(width: bubble.width, height: bubble.height)
+                    .frame(maxWidth: .infinity, alignment: bubble.outgoing ? .trailing : .leading)
             }
+        }
+        .padding(.horizontal, DS.Metrics.chatGutter)
+        .padding(.bottom, 12)
+        .allowsHitTesting(false)
+        .skeleton()
     }
 }
 

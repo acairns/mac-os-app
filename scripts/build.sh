@@ -147,6 +147,12 @@ MOUNT="/Volumes/$VOLUME"
 # The volume shows the app's icon.
 xattr -wx com.apple.FinderInfo "0000000000000000040000000000000000000000000000000000000000000000" "$MOUNT"
 
+# Finder learns about the new volume a moment after it mounts; asking before then fails with "Can't get disk".
+for _ in {1..20}; do
+    osascript -e "tell application \"Finder\" to exists disk \"$VOLUME\"" 2>/dev/null | grep -q true && break
+    sleep 0.5
+done
+
 osascript <<APPLESCRIPT
 tell application "Finder"
     tell disk "$VOLUME"

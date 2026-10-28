@@ -1,6 +1,7 @@
 #if DEBUG
     import AppKit
     import Foundation
+    import SwiftUI
 
     /// A debug-only stand-in for the API, for designing and testing the app without a signed-in account or the Keychain:
     /// the "DevNull Preview" bundle (`sh.dev-null.mac.preview`) answers every request with made-up people and threads,
@@ -19,7 +20,10 @@
 
     /// Lets a script drive the preview without focusing it: `open:@maya`, `draft:text`, `send:text`, `bottom`,
     /// `appearance:dark|light`, `size:1100x720`, `lightbox`, `menu`, `hover:<id>`, `scroll:<id>`, `top`, `react:<id>`,
-    /// `emoji[:off]`, `record:holding|locked|off`, `paste`, `reply`, `attach:<1-3>`, `info`, `search`, `poll`, `tab:open|fetched|stashed`, posted after the preview's bundle identifier and a space as the
+    /// `emoji[:off]`, `record:holding|locked|off`, `paste`, `reply`, `attach:<1-3>`, `info`, `search`, `poll`, `tab:open|fetched|stashed`,
+    /// and for the workspace `item:following|latest|trending|remotes|stashed|notifications|starred|scheduled|profile`,
+    /// `thread:<id|first>`, `commit:<id|first>`, `profile:@handle`, `results:<query>`, `switcher`, `composer`,
+    /// `settings:<tab>`, `focus:j|k`, `pane`, `shortcuts`, `back`, posted after the preview's bundle identifier and a space as the
     /// object of the "sh.dev-null.preview.command" distributed notification.
     @MainActor
     enum PreviewCommands {
@@ -80,8 +84,47 @@
                 } else {
                     PreviewStore.shared.update = argument
                 }
+            case "item", "thread", "profile", "commit", "switcher", "composer", "settings", "focus", "results", "pane", "shortcuts", "back", "compose", "submit", "rm", "undo":
+                // The workspace commands act on the frontmost window's navigation, which listens for them.
+                NotificationCenter.default.post(name: .previewWorkspaceAction, object: command)
             case "appearance":
                 NSApp.appearance = NSAppearance(named: argument == "dark" ? .darkAqua : .aqua)
+            case "snapshot":
+                // Renders the largest window into a PNG at the given path, without it having to be on screen.
+                // "-small-" in the path captures the smallest window (the composer), "-settings-" the Settings window,
+                // and "-sheet-" the sheet over the main window.
+                let windows = NSApp.windows.filter { $0.isVisible && $0.canBecomeMain }
+                let main = windows.max(by: { $0.frame.width < $1.frame.width })
+                let window: NSWindow? = if argument.contains("-sheet-") {
+                    main?.attachedSheet
+                } else if argument.contains("-settings-") {
+                    NSApp.windows.first { $0.isVisible && $0 !== main && $0.level == .normal && !$0.isSheet && $0.frame.width > 100 }
+                } else if argument.contains("-small-") {
+                    windows.min(by: { $0.frame.width < $1.frame.width })
+                } else {
+                    main
+                }
+                if let window {
+                    PreviewSnapshot.write(window, to: argument)
+                }
+            case "settingsview":
+                // `settingsview:<tab>|<path>`: draws the Settings pane in a window of its own and captures it, since the
+                // real Settings window only opens while the app is active.
+                let parts = argument.split(separator: "|", maxSplits: 1).map(String.init)
+                guard parts.count == 2 else { return }
+                UserDefaults.standard.set(parts[0], forKey: "settings-tab")
+                let host = NSHostingView(rootView: SettingsView().environment(session))
+                let window = NSWindow(contentRect: NSRect(x: -4000, y: 0, width: 520, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+                window.contentView = host
+                window.setContentSize(host.fittingSize)
+                window.orderFrontRegardless()
+                Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    window.setContentSize(host.fittingSize)
+                    try? await Task.sleep(for: .milliseconds(300))
+                    PreviewSnapshot.write(window, to: parts[1])
+                    window.orderOut(nil)
+                }
             case "size":
                 let size = argument.split(separator: "x").compactMap { Double($0) }
                 if size.count == 2, let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) {
@@ -93,9 +136,27 @@
         }
     }
 
+    /// Draws a window's layers into a PNG, so the preview can be captured while it is behind other windows or on
+    /// another Space.
+    @MainActor
+    enum PreviewSnapshot {
+        static func write(_ window: NSWindow, to path: String) {
+            guard let view = window.contentView?.superview ?? window.contentView else { return }
+
+            let scale = window.backingScaleFactor
+            let size = view.bounds.size
+            guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+
+            rep.size = size
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        }
+    }
+
     extension Notification.Name {
         static let previewChatAction = Notification.Name("devnull.previewChatAction")
         static let previewComposerAction = Notification.Name("devnull.previewComposerAction")
+        static let previewWorkspaceAction = Notification.Name("devnull.previewWorkspaceAction")
     }
 
     /// Answers the app's requests from an in-memory store.
@@ -113,7 +174,10 @@
             let body = request.httpBody ?? request.httpBodyStream.map(Self.read) ?? Data()
             let isWrite = request.httpMethod != "GET"
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + (isWrite ? 0.35 : 0.08)) { [weak self] in
+            // `DEVNULL_PREVIEW_LATENCY=1.5` answers every request that many seconds late, to see the app on a slow API.
+            let latency = Double(ProcessInfo.processInfo.environment["DEVNULL_PREVIEW_LATENCY"] ?? "") ?? (isWrite ? 0.35 : 0.08)
+
+            DispatchQueue.global().asyncAfter(deadline: .now() + latency) { [weak self] in
                 guard let self, let url = request.url else { return }
 
                 let (status, data, type) = PreviewStore.shared.respond(method: request.httpMethod ?? "GET", url: url, body: body, contentType: request.value(forHTTPHeaderField: "Content-Type") ?? "")
@@ -176,16 +240,8 @@
             var reactionChanges: [Int: Int] = [:]
         }
 
-        static let people: [String: (name: String, lane: Int, bio: String)] = [
-            "you": ("Preview You", 0, "Building things on /dev/null."),
-            "maya": ("Maya Chen", 1, "Design systems, type, and too much coffee."),
-            "theo": ("Theo Park", 2, "Backend. Queues. Retries."),
-            "rosa": ("Rosa Díaz", 3, "Shipping the iOS app."),
-            "sam": ("Sam Okafor", 4, "Infra and late-night deploys."),
-            "lena": ("Lena Novak", 5, "Writes the docs nobody reads (you should)."),
-            "ivan": ("Ivan Petrov", 2, "Rust, mostly."),
-            "zoe": ("Zoë Martin", 4, "Product."),
-        ]
+        /// The made-up cast, shared with the workspace fixtures so a person is the same everywhere.
+        static let people = PreviewWorkspaceStore.cast
 
         private init() {
             seed()
@@ -342,8 +398,14 @@
             let route = path.replacingOccurrences(of: "/api/v1/", with: "")
             let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] ?? Self.multipartPayload(body, contentType: contentType)
 
+            if let (status, object) = PreviewWorkspaceStore.shared.respond(method: method, route: route, query: query, json: json) {
+                guard let object else { return empty() }
+
+                return (status, (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), "application/json")
+            }
+
             switch (method, route) {
-            case ("GET", "me"), ("PUT", "me/remotes"), ("PUT", "me/remote-preferences"):
+            case ("PUT", "me/remotes"), ("PUT", "me/remote-preferences"):
                 return ok(["data": currentUser()])
             case ("GET", "remotes"):
                 return ok(inbox(tab: query["tab"] ?? "open", search: query["q"] ?? ""))
@@ -357,7 +419,7 @@
                 }
 
                 return ok(["data": [
-                    "version": update == "available" ? "0.2" : Updates.version,
+                    "version": update == "available" ? "0.3.0" : Updates.version,
                     "build": Updates.build + (update == "available" ? 1 : 0),
                     "url": "https://\(Preview.host)/apps",
                 ]])
@@ -443,8 +505,7 @@
         }
 
         private func currentUser() -> [String: Any] {
-            ["id": "u-me", "handle": "you", "name": "Preview You", "avatar_url": NSNull(), "html_url": NSNull(), "lane": 0,
-             "remotes": ["from": "following", "pull_receipts": true, "requests": true, "everyone": true, "unread_count": 0]]
+            PreviewWorkspaceStore.shared.currentUser()
         }
 
         // MARK: Inbox

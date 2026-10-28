@@ -23,7 +23,7 @@ enum AboutWindow {
     }
 
     private static func make() -> NSWindow {
-        let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+        let window = AboutNSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "About /dev/null"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -39,6 +39,13 @@ enum AboutWindow {
         window.center()
 
         return window
+    }
+}
+
+/// The About window, closing on Esc like the standard panel does.
+private final class AboutNSWindow: NSWindow {
+    override func cancelOperation(_ sender: Any?) {
+        performClose(sender)
     }
 }
 

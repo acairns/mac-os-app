@@ -23,12 +23,16 @@ final class Session {
     private(set) var api: APIClient? {
         didSet {
             inbox?.stop()
+            workspace?.stop()
             inbox = api.map { Inbox(session: self, api: $0) }
+            workspace = api.map { Workspace(session: self, api: $0) }
         }
     }
 
     /// One inbox for the app, whichever windows show it, so polling and alerts don't run twice.
     private(set) var inbox: Inbox?
+    /// The logs, threads, notifications, profiles, queue, search and drafts, shared by every window like the inbox.
+    private(set) var workspace: Workspace?
     var error: String?
 
     private var pending: (state: String, verifier: String)?
@@ -148,6 +152,10 @@ final class Session {
     /// there, but nothing can use it.
     func signOut() {
         DeviceKey.delete()
+        // The account's preferences go with it: where each log was last read and the notification filter.
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("head-last-visit-") || key == "notification-filter" || key == "last-conversation" {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         api = nil
         user = nil
         phase = .signedOut

@@ -47,6 +47,11 @@ struct User: Codable, Hashable, Identifiable {
     var avatarURL: URL? {
         avatarUrl.flatMap(URL.init(string:))
     }
+
+    /// Tom and @world never sign in; replies from them carry a `bot` chip.
+    var isBot: Bool {
+        ["tom", "world", "devnull-world"].contains(handle.lowercased())
+    }
 }
 
 struct RemotesSettings: Codable, Hashable {
@@ -65,9 +70,23 @@ struct CurrentUser: Codable, Hashable {
     let htmlUrl: String?
     let lane: Lane?
     let remotes: RemotesSettings?
+    var bio: String? = nil
+    var company: String? = nil
+    var location: String? = nil
+    var website: String? = nil
+    var createdAt: Date? = nil
+    var commitsCount: Int? = nil
+    var followersCount: Int? = nil
+    var followingCount: Int? = nil
+    var pasteisMode: Bool? = nil
+    var pasteisRemaining: Int? = nil
+    /// The lane or color the user picked, or nil for Automatic, and the lane Automatic gives them.
+    var preferredLane: Lane? = nil
+    var automaticLane: Int? = nil
+    var githubSyncedAt: Date? = nil
 
     var asUser: User {
-        User(id: id, handle: handle, name: name, avatarUrl: avatarUrl, bio: nil, htmlUrl: htmlUrl, lane: lane, isFollowed: nil, followsYou: nil)
+        User(id: id, handle: handle, name: name, avatarUrl: avatarUrl, bio: bio, htmlUrl: htmlUrl, lane: lane, isFollowed: nil, followsYou: nil)
     }
 }
 

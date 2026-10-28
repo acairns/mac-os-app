@@ -6,6 +6,8 @@ struct ThreadInfoView: View {
     @Environment(Session.self) private var session
     @Environment(\.dismiss) private var dismiss
     let thread: ThreadModel
+    /// Shown in the replies pane beside the chat, which has its own close button, instead of as a sheet.
+    var isPane = false
 
     @State private var name = ""
     @State private var showsAdd = false
@@ -23,17 +25,22 @@ struct ThreadInfoView: View {
                 orgInfo
             }
 
-            DS.Colors.hairline.frame(height: 1)
+            if isPane {
+                Spacer(minLength: 0)
+            } else {
+                DS.Colors.hairline.frame(height: 1)
 
-            HStack {
-                Spacer()
-                Button("Done") { dismiss() }
-                    .buttonStyle(.dsPrimary)
-                    .keyboardShortcut(.defaultAction)
+                HStack {
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .buttonStyle(.dsPrimary)
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding(DS.Spacing.l)
             }
-            .padding(DS.Spacing.l)
         }
-        .frame(width: 420)
+        .frame(width: isPane ? nil : 420)
+        .frame(maxWidth: isPane ? .infinity : nil, maxHeight: isPane ? .infinity : nil, alignment: .top)
         .background(DS.Colors.popover)
         .onAppear { name = thread.orgName ?? "" }
         .sheet(isPresented: $showsAdd) {
@@ -78,8 +85,8 @@ struct ThreadInfoView: View {
                     .padding(.top, DS.Spacing.xs)
             }
 
-            Button("View Profile on /dev/null") {
-                NSWorkspace.shared.open(APIClient.baseURL.appending(path: "@" + partner.handle))
+            Button("View Profile") {
+                NotificationCenter.default.post(name: .openProfile, object: partner.handle)
             }
             .buttonStyle(.dsOutline)
             .padding(.top, DS.Spacing.l)
@@ -133,7 +140,7 @@ struct ThreadInfoView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .frame(height: 300)
+            .frame(minHeight: 200, maxHeight: isPane ? .infinity : 300)
             .overlay(RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous).strokeBorder(DS.Colors.hairline))
 
             if thread.role != nil, let me = session.user?.asUser {

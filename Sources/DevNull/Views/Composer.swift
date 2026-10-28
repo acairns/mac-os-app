@@ -7,10 +7,12 @@ import UniformTypeIdentifiers
 enum Completion: Equatable {
     case mention(query: String, range: NSRange)
     case emoji(query: String, range: NSRange)
+    /// `#12` in a commit, for the repository's GitHub issue suggestions.
+    case issue(query: String, range: NSRange)
 
     var range: NSRange {
         switch self {
-        case let .mention(_, range), let .emoji(_, range): range
+        case let .mention(_, range), let .emoji(_, range), let .issue(_, range): range
         }
     }
 }
@@ -312,7 +314,7 @@ struct Composer: View {
             return (prefixed + contained)
                 .prefix(6)
                 .map { Suggestion(id: $0.name, title: $0.emoji, detail: ":\($0.name):", user: nil, emoji: $0.emoji, insertion: $0.emoji) }
-        case nil:
+        case .issue?, nil:
             return []
         }
     }
@@ -760,6 +762,12 @@ struct ComposerTextView: NSViewRepresentable {
     let onCompletionKey: (CompletionKey) -> Bool
     let maxLength: Int
     let onPasteRejected: (Int) -> Void
+    /// Commits take Return as a new line and ⌘↩ to send; remotes push on Return.
+    var submitsOnCommandReturn = false
+    var focusesOnAppear = true
+    var accessibilityLabel = "Message"
+    /// Whether `#123` words are reported, which only commits link to issues.
+    var completesIssues = false
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -784,7 +792,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
         textView.string = text
-        textView.setAccessibilityLabel("Message")
+        textView.setAccessibilityLabel(accessibilityLabel)
         handle.textView = textView
 
         let scrollView = NSScrollView()
@@ -796,7 +804,7 @@ struct ComposerTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         DispatchQueue.main.async {
-            textView.window?.makeFirstResponder(textView)
+            if focusesOnAppear { textView.window?.makeFirstResponder(textView) }
             textView.setSelectedRange(NSRange(location: (textView.string as NSString).length, length: 0))
             context.coordinator.recalculateHeight(textView)
         }
@@ -878,6 +886,9 @@ struct ComposerTextView: NSViewRepresentable {
                     completion = .mention(query: String(word.dropFirst()), range: range)
                 } else if word.hasPrefix(":"), word.count >= 3, !word.dropFirst().contains(":"), word.dropFirst().allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "+" || $0 == "-" }) {
                     completion = .emoji(query: String(word.dropFirst()), range: range)
+                } else if parent.completesIssues, word.hasPrefix("#"), (2 ... 11).contains(word.count), word.dropFirst().first != "0", word.count != 7, word.dropFirst().allSatisfy(\.isASCIIDigitCharacter) {
+                    // "#1234" is an issue of the repository, as on the web; six digits read as a color instead.
+                    completion = .issue(query: String(word.dropFirst()), range: range)
                 }
             }
 
@@ -901,7 +912,13 @@ struct ComposerTextView: NSViewRepresentable {
             case #selector(NSResponder.insertNewline(_:)):
                 let flags = NSApp.currentEvent?.modifierFlags ?? []
 
-                if flags.contains(.shift) || flags.contains(.option) {
+                if parent.submitsOnCommandReturn {
+                    if flags.contains(.command) {
+                        parent.onSubmit()
+                    } else if !parent.onCompletionKey(.accept) {
+                        textView.insertNewlineIgnoringFieldEditor(nil)
+                    }
+                } else if flags.contains(.shift) || flags.contains(.option) {
                     textView.insertNewlineIgnoringFieldEditor(nil)
                 } else if !parent.onCompletionKey(.accept) {
                     parent.onSubmit()
@@ -919,6 +936,17 @@ struct ComposerTextView: NSViewRepresentable {
 
     final class SubmittingTextView: NSTextView {
         weak var coordinator: Coordinator?
+
+        /// ⌘↩ reaches the menu bar before the text view, so a commit composer takes it here while it has the focus.
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            if let parent = coordinator?.parent, parent.submitsOnCommandReturn, window?.firstResponder === self,
+               event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.keyCode == 36 || event.keyCode == 76 {
+                parent.onSubmit()
+                return true
+            }
+
+            return super.performKeyEquivalent(with: event)
+        }
 
         override func paste(_ sender: Any?) {
             let pasteboard = NSPasteboard.general
@@ -1231,4 +1259,8 @@ struct EmojiPicker: View {
 
         return hovered == emoji ? DS.Colors.wash : .clear
     }
+}
+
+private extension Character {
+    var isASCIIDigitCharacter: Bool { isASCII && isNumber }
 }

@@ -1,70 +1,5 @@
 import SwiftUI
 
-struct MainView: View {
-    @Environment(Inbox.self) private var inbox
-    @State private var showsNewRemote = false
-    @State private var showsNewOrg = false
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
-
-    var body: some View {
-        @Bindable var inbox = inbox
-
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showsNewRemote: $showsNewRemote, showsNewOrg: $showsNewOrg)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
-        } detail: {
-            if let reference = inbox.selection {
-                ChatView(thread: inbox.thread(for: reference))
-                    .id(reference.id)
-            } else {
-                EmptyChatView(showsNewRemote: $showsNewRemote)
-            }
-        }
-        .sheet(isPresented: $showsNewRemote) {
-            PeoplePicker(mode: .remote) { users, _, _ in
-                if let user = users.first {
-                    inbox.selection = .direct(user)
-                }
-            }
-        }
-        .sheet(isPresented: $showsNewOrg) {
-            PeoplePicker(mode: .newOrg) { users, name, _ in
-                Task { await createOrg(users, name: name) }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newRemote)) { _ in showsNewRemote = true }
-        .onReceive(NotificationCenter.default.publisher(for: .newOrg)) { _ in showsNewOrg = true }
-        .onAppear {
-            if let id = AppDelegate.pendingConversation {
-                AppDelegate.pendingConversation = nil
-                inbox.open(conversationId: id)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
-            if let id = notification.object as? String {
-                inbox.open(conversationId: id)
-            }
-        }
-    }
-
-    private func createOrg(_ users: [User], name: String) async {
-        struct Created: Decodable { struct Org: Decodable { let id: String }; let org: Org }
-
-        do {
-            let created: Created = try await inbox.api.send("POST", "remotes/orgs", json: [
-                "name": name.isEmpty ? NSNull() : name,
-                "members": users.map(\.handle),
-            ])
-
-            await inbox.refresh()
-            inbox.tab = .open
-            inbox.selection = .org(id: created.org.id, name: name.isEmpty ? nil : name)
-        } catch {
-            presentAlert(error.localizedDescription)
-        }
-    }
-}
-
 struct EmptyChatView: View {
     @Binding var showsNewRemote: Bool
 
@@ -79,11 +14,12 @@ struct EmptyChatView: View {
     }
 }
 
-struct SidebarView: View {
+/// Every remote, as the inbox was before the workspace: the Open, Fetched and Stashed tabs, the search, and the rows
+/// with their menus. Picking a row opens its chat in place.
+struct AllRemotesView: View {
     @Environment(Inbox.self) private var inbox
     @Environment(Session.self) private var session
-    @Binding var showsNewRemote: Bool
-    @Binding var showsNewOrg: Bool
+    @Binding var selection: ThreadReference?
     @State private var candidates: [Candidate] = []
 
     var body: some View {
@@ -93,11 +29,11 @@ struct SidebarView: View {
             SidebarTabs(tabs: availableTabs, selection: $inbox.tab, requestsCount: inbox.requestsCount)
 
             // Inset like the selection's rounded rect, with room below so a selected row never touches the field.
-            SearchField(prompt: "Search remotes", text: $inbox.search, focusedBy: .focusSearch)
+            SearchField(prompt: "Search remotes", text: $inbox.search, focusedBy: .findInList)
                 .padding(.horizontal, DS.Metrics.sidebarInset)
                 .padding(.vertical, DS.Spacing.m)
 
-            List(selection: $inbox.selection) {
+            List(selection: $selection) {
                 if inbox.isLoading {
                     ForEach(0 ..< 8, id: \.self) { _ in
                         SkeletonRow()
@@ -115,7 +51,7 @@ struct SidebarView: View {
 
                 ForEach(inbox.conversations) { conversation in
                     ConversationRow(conversation: conversation, me: session.user?.id)
-                        .sidebarSelection(inbox.selection == conversation.reference)
+                        .sidebarSelection(selection == conversation.reference)
                         .tag(conversation.reference)
                         .contextMenu { ConversationMenu(conversation: conversation) }
                         .onHover { $0 ? inbox.prefetch(conversation.reference) : inbox.cancelPrefetch(conversation.reference) }
@@ -130,7 +66,7 @@ struct SidebarView: View {
                     Section {
                         ForEach(suggestedCandidates) { candidate in
                             CandidateSearchRow(candidate: candidate)
-                                .sidebarSelection(inbox.selection == .direct(candidate.user))
+                                .sidebarSelection(selection == .direct(candidate.user))
                                 .tag(ThreadReference.direct(candidate.user))
                                 .selectionDisabled(candidate.reason != nil)
                         }
@@ -145,17 +81,6 @@ struct SidebarView: View {
         }
         .background(DS.Colors.surface)
         .task(id: inbox.search) { await searchCandidates() }
-        .toolbar {
-            ToolbarItem {
-                Menu {
-                    Button("New Remote…", systemImage: "person") { showsNewRemote = true }
-                    Button("New Org…", systemImage: "person.2") { showsNewOrg = true }
-                } label: {
-                    Label("Compose", systemImage: "square.and.pencil")
-                }
-                .help("Start a remote or an org")
-            }
-        }
     }
 
     private var availableTabs: [InboxTab] {
@@ -196,7 +121,7 @@ struct SidebarView: View {
         if !inbox.search.isEmpty { return ("fatal: no remotes match “\(inbox.search)”", "Try a name or an @handle.") }
 
         return switch inbox.tab {
-        case .open: ("no remotes yet", "Press ⌘N to push to someone.")
+        case .open: ("no remotes yet", "Press ⇧⌘N to push to someone.")
         case .fetched: ("fatal: nothing fetched", "No requests waiting.")
         case .stashed: ("fatal: stash is empty", "Stashed remotes land here.")
         }
